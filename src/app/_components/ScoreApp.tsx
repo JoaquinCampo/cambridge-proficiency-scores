@@ -108,6 +108,10 @@ export const ScoreApp = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [results, setResults] = useState<ResultsSnapshot | null>(null);
+  const [emailStatus, setEmailStatus] = useState<
+    "idle" | "sending" | "sent" | "error"
+  >("idle");
+  const [emailMessage, setEmailMessage] = useState<string | null>(null);
 
   const validation = useMemo(() => {
     const errors: Partial<Record<ComponentKey, string>> = {};
@@ -151,6 +155,8 @@ export const ScoreApp = () => {
     setRawScores(emptyScores);
     setResults(null);
     setConfirmError(null);
+    setEmailStatus("idle");
+    setEmailMessage(null);
   };
 
   const openConfirmDialog = () => {
@@ -158,7 +164,59 @@ export const ScoreApp = () => {
     setDialogOpen(true);
   };
 
-  const handleConfirm = () => {
+  const buildRawPayload = () => {
+    const payload: Partial<Record<ComponentKey, number>> = {};
+    componentOrder.forEach((key) => {
+      const rawValue = parseScoreValue(rawScores[key]);
+      if (rawValue !== null) {
+        payload[key] = rawValue;
+      }
+    });
+    return payload;
+  };
+
+  const sendResultsEmail = async (
+    payload: Partial<Record<ComponentKey, number>>,
+  ) => {
+    setEmailStatus("sending");
+    setEmailMessage(null);
+    try {
+      const response = await fetch("/api/send-results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidate,
+          rawScores: payload,
+        }),
+      });
+      let errorMessage: string | null = null;
+      try {
+        const payloadData: unknown = await response.json();
+        if (payloadData && typeof payloadData === "object") {
+          const errorValue = (payloadData as { error?: unknown }).error;
+          if (typeof errorValue === "string") {
+            errorMessage = errorValue;
+          }
+        }
+      } catch {
+        errorMessage = null;
+      }
+
+      if (!response.ok) {
+        setEmailStatus("error");
+        setEmailMessage(errorMessage ?? "Unable to send the results email.");
+        return;
+      }
+
+      setEmailStatus("sent");
+      setEmailMessage("Results email sent successfully.");
+    } catch {
+      setEmailStatus("error");
+      setEmailMessage("Network error while sending the results email.");
+    }
+  };
+
+  const handleConfirm = async () => {
     if (!hasAnyScore) {
       setConfirmError("Enter at least one paper score to continue.");
       return;
@@ -168,10 +226,11 @@ export const ScoreApp = () => {
       return;
     }
 
+    const rawPayload = buildRawPayload();
     const scaleScores: Partial<Record<ComponentKey, number>> = {};
     componentOrder.forEach((key) => {
-      const rawValue = parseScoreValue(rawScores[key]);
-      if (rawValue !== null) {
+      const rawValue = rawPayload[key];
+      if (typeof rawValue === "number") {
         scaleScores[key] = estimateScaleScore(key, rawValue);
       }
     });
@@ -179,6 +238,7 @@ export const ScoreApp = () => {
     const overall = calculateOverallScore(scaleScores);
     setResults({ scaleScores, overall });
     setDialogOpen(false);
+    void sendResultsEmail(rawPayload);
   };
 
   const overallBand = results?.overall?.overall
@@ -358,9 +418,9 @@ export const ScoreApp = () => {
                   Average of available papers (Scale score).
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {results ? (
-                  <>
+            <CardContent className="space-y-4">
+              {results ? (
+                <>
                     <div className="flex items-end gap-4">
                       <div className="text-5xl font-semibold">
                         {results.overall?.overall ?? "—"}
@@ -394,6 +454,32 @@ export const ScoreApp = () => {
                         official Cambridge calculation.
                       </p>
                     ) : null}
+                    <div className="rounded-2xl border border-[color-mix(in_oklab,var(--ink)_12%,transparent)] bg-white/60 p-4 text-sm">
+                      <p className="font-semibold text-[var(--ink)]">
+                        Email status
+                      </p>
+                      <p className="mt-2 text-xs text-[color-mix(in_oklab,var(--ink)_60%,transparent)]">
+                        {emailMessage ??
+                          "An email will be sent after confirmation."}
+                      </p>
+                      {emailStatus === "sending" ? (
+                        <p className="mt-2 text-xs text-[color-mix(in_oklab,var(--ink)_60%,transparent)]">
+                          Sending results to the configured recipient...
+                        </p>
+                      ) : null}
+                      {emailStatus === "error" ? (
+                        <div className="mt-3">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            type="button"
+                            onClick={() => void sendResultsEmail(buildRawPayload())}
+                          >
+                            Retry email
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
                   </>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-[color-mix(in_oklab,var(--ink)_20%,transparent)] bg-white/60 p-6 text-sm text-[color-mix(in_oklab,var(--ink)_60%,transparent)]">
