@@ -9,6 +9,20 @@ import {
 } from "~/server/api/trpc";
 
 export const userRouter = createTRPCRouter({
+  me: protectedProcedure.query(async ({ ctx }) => {
+    const user = await ctx.db.user.findUnique({
+      where: { clerkId: ctx.userId },
+    });
+
+    return {
+      clerkId: ctx.userId,
+      orgId: ctx.orgId,
+      role: ctx.role ?? "student",
+      name: user?.name ?? null,
+      email: user?.email ?? null,
+    };
+  }),
+
   list: teacherProcedure.query(async ({ ctx }) => {
     if (!ctx.orgId) {
       throw new TRPCError({
@@ -17,30 +31,20 @@ export const userRouter = createTRPCRouter({
       });
     }
 
-    // In dev mode, return all students from DB (no Clerk dependency)
-    if (process.env.NODE_ENV === "development") {
-      return ctx.db.user.findMany({
-        where: { clerkId: { startsWith: "user_fake_student_" } },
-        orderBy: { name: "asc" },
-      });
-    }
-
-    const clerk = await clerkClient();
-    const memberships =
-      await clerk.organizations.getOrganizationMembershipList({
-        organizationId: ctx.orgId,
-      });
-
-    const studentMembers = memberships.data.filter((m) => {
-      return m.role === "org:member";
+    // Return all users in this org's score logs, excluding the current teacher
+    const scoreUsers = await ctx.db.scoreLog.findMany({
+      where: { organizationId: ctx.orgId },
+      select: { userId: true },
+      distinct: ["userId"],
     });
 
-    const userIds = studentMembers
-      .map((m) => m.publicUserData?.userId)
-      .filter((id): id is string => !!id);
+    const studentIds = scoreUsers
+      .map((s) => s.userId)
+      .filter((id) => id !== ctx.userId);
 
     const users = await ctx.db.user.findMany({
-      where: { clerkId: { in: userIds } },
+      where: { clerkId: { in: studentIds } },
+      orderBy: { name: "asc" },
     });
 
     return users;

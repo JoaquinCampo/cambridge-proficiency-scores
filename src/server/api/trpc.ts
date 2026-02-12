@@ -1,24 +1,31 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 
 import { db } from "~/server/db";
 
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-  const clerkAuth = await auth();
+  const { userId, orgId } = await auth();
 
-  const isDev = process.env.NODE_ENV === "development";
-  const userId = clerkAuth.userId ?? (isDev ? "user_fake_student_001" : null);
-  const orgId = clerkAuth.orgId ?? (isDev ? "org_fake_academy" : null);
-  const sessionClaims = clerkAuth.sessionClaims ?? (isDev ? { metadata: { role: "teacher" } } as unknown as typeof clerkAuth.sessionClaims : null);
+  // Resolve role from Clerk publicMetadata (cached per request)
+  let role: string | null = null;
+  if (userId) {
+    try {
+      const clerk = await clerkClient();
+      const user = await clerk.users.getUser(userId);
+      role = (user.publicMetadata as { role?: string })?.role ?? null;
+    } catch {
+      // Clerk API unavailable — role stays null
+    }
+  }
 
   return {
     ...opts,
     db,
     userId,
     orgId,
-    sessionClaims,
+    role,
   };
 };
 
@@ -72,10 +79,7 @@ export const protectedProcedure = t.procedure
   .use(enforceAuth);
 
 const enforceTeacher = t.middleware(async ({ ctx, next }) => {
-  const role = (
-    ctx.sessionClaims?.metadata as { role?: string } | undefined
-  )?.role;
-  if (role !== "teacher") {
+  if (ctx.role !== "teacher") {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
   return next({ ctx });

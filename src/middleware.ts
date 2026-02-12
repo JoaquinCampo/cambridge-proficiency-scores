@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
@@ -6,10 +7,23 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhooks(.*)",
 ]);
 
+const isNoGroupRoute = createRouteMatcher(["/no-group(.*)"]);
+
 export default clerkMiddleware(async (auth, request) => {
-  // Auth disabled for local development
-  if (process.env.NODE_ENV === "production" && !isPublicRoute(request)) {
-    await auth.protect();
+  if (isPublicRoute(request)) {
+    return;
+  }
+
+  const { orgId } = await auth.protect();
+
+  // Authenticated but no organization — redirect to /no-group
+  if (!orgId && !isNoGroupRoute(request)) {
+    return NextResponse.redirect(new URL("/no-group", request.url));
+  }
+
+  // On /no-group with an org — send them to the app
+  if (orgId && isNoGroupRoute(request)) {
+    return NextResponse.redirect(new URL("/", request.url));
   }
 });
 
