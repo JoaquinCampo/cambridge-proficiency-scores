@@ -10,15 +10,15 @@ export type BadgeProps = React.HTMLAttributes<HTMLSpanElement> & {
 
 const badgeStyles: Record<BadgeVariant, string> = {
   accent: "bg-[var(--accent)] text-white",
-  muted: "bg-[color-mix(in_oklab,var(--ink)_8%,transparent)] text-[var(--ink)]",
+  muted: "bg-[var(--surface)] text-[#7A7A7A]",
   success: "bg-[var(--accent-2)] text-white",
-  warning: "bg-[var(--gold)] text-white",
+  warning: "bg-[#F59E0B] text-white",
 };
 
 export const Badge = ({ className, variant = "muted", ...props }: BadgeProps) => (
   <span
     className={cn(
-      "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em]",
+      "inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-medium",
       badgeStyles[variant],
       className,
     )}

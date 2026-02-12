@@ -5,17 +5,49 @@
 }
 
 :root {
-  --bg: #f6efe3;
-  --ink: #1f1b16;
-  --accent: #8b1e3f;
-  --accent-2: #0f4c5c;
-  --gold: #b8894a;
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --primary: #2563EB;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #0F172A;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent: #F1F5F9;
+  --accent-foreground: #0F172A;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #E2E8F0;
+  --ring: #2563EB;
+
+  /* Band colors */
+  --band-grade-a: #16A34A;
+  --band-grade-b: #2563EB;
+  --band-grade-c: #7C3AED;
+  --band-c1: #D97706;
+  --band-below-c1: #94A3B8;
+
+  /* Skill colors */
+  --skill-reading: #2563EB;
+  --skill-uoe: #7C3AED;
+  --skill-writing: #16A34A;
+  --skill-listening: #D97706;
+  --skill-speaking: #DC2626;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-m: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
 }
 
 body {
   font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--ink);
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
 }
 
 .font-display {
