@@ -50,14 +50,15 @@ const updateScoreInput = z.object({
   notes: z.string().max(500).optional().nullable(),
 });
 
-function enrichScore(score: {
-  reading: number | null;
-  useOfEnglish: number | null;
-  writing: number | null;
-  listening: number | null;
-  speaking: number | null;
-  [key: string]: unknown;
-}) {
+function enrichScore<
+  T extends {
+    reading: number | null;
+    useOfEnglish: number | null;
+    writing: number | null;
+    listening: number | null;
+    speaking: number | null;
+  },
+>(score: T) {
   const components: { key: ComponentKey; raw: number | null }[] = [
     { key: "reading", raw: score.reading },
     { key: "useOfEnglish", raw: score.useOfEnglish },
@@ -207,6 +208,234 @@ export const scoreRouter = createTRPCRouter({
     }
 
     return result;
+  }),
+
+  dashboard: teacherProcedure.query(async ({ ctx }) => {
+    if (!ctx.orgId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "No active organization",
+      });
+    }
+
+    const allScores = await ctx.db.scoreLog.findMany({
+      where: { organizationId: ctx.orgId },
+      orderBy: { examDate: "desc" },
+      include: { user: true },
+    });
+
+    // Group by student — keep examDate alongside enriched data
+    type EnrichedWithDate = ReturnType<typeof enrichScore> & {
+      examDate: Date;
+    };
+    const byStudent = new Map<
+      string,
+      { name: string; scores: EnrichedWithDate[] }
+    >();
+    for (const score of allScores) {
+      const enriched = {
+        ...enrichScore(score),
+        examDate: score.examDate,
+      };
+      const existing = byStudent.get(score.userId);
+      if (existing) {
+        existing.scores.push(enriched);
+      } else {
+        byStudent.set(score.userId, {
+          name: score.user.name ?? "Unknown",
+          scores: [enriched],
+        });
+      }
+    }
+
+    // Filter out the teacher
+    if (ctx.userId) byStudent.delete(ctx.userId);
+
+    const totalStudents = byStudent.size;
+
+    // Latest score per student
+    const latestPerStudent = [...byStudent.entries()].map(
+      ([userId, { name, scores }]) => {
+        const latest = scores[0]!;
+        const previous = scores[1];
+        return { userId, name, latest, previous };
+      },
+    );
+
+    // Class average (from latest scores)
+    const latestOveralls = latestPerStudent.map((s) => s.latest.overall);
+    const classAverage =
+      latestOveralls.length > 0
+        ? Math.round(
+            latestOveralls.reduce((a, b) => a + b, 0) / latestOveralls.length,
+          )
+        : 0;
+
+    // Pass rate (C1+ = overall >= 180)
+    const passing = latestOveralls.filter((o) => o >= 180).length;
+    const passRate =
+      totalStudents > 0 ? Math.round((passing / totalStudents) * 100) : 0;
+
+    // Average completion (skills per exam, across ALL scores)
+    const allEnriched = [...byStudent.values()].flatMap((s) => s.scores);
+    const totalIncluded = allEnriched.reduce((sum, s) => sum + s.included, 0);
+    const avgCompletion =
+      allEnriched.length > 0
+        ? +(totalIncluded / allEnriched.length).toFixed(1)
+        : 0;
+
+    // Band distribution (from latest scores)
+    const bandDistribution = { A: 0, B: 0, C: 0, C1: 0, below: 0 };
+    for (const s of latestPerStudent) {
+      const label = s.latest.band.label;
+      if (label === "Grade A") bandDistribution.A++;
+      else if (label === "Grade B") bandDistribution.B++;
+      else if (label === "Grade C") bandDistribution.C++;
+      else if (label === "Level C1") bandDistribution.C1++;
+      else bandDistribution.below++;
+    }
+
+    // Class skill averages (from latest scores only)
+    const skillTotals: Record<ComponentKey, { sum: number; count: number }> = {
+      reading: { sum: 0, count: 0 },
+      useOfEnglish: { sum: 0, count: 0 },
+      writing: { sum: 0, count: 0 },
+      listening: { sum: 0, count: 0 },
+      speaking: { sum: 0, count: 0 },
+    };
+    for (const s of latestPerStudent) {
+      for (const [key, value] of Object.entries(s.latest.scaleScores)) {
+        if (value != null) {
+          const k = key as ComponentKey;
+          skillTotals[k].sum += value;
+          skillTotals[k].count++;
+        }
+      }
+    }
+    const skillAverages = Object.fromEntries(
+      Object.entries(skillTotals).map(([key, { sum, count }]) => [
+        key,
+        count > 0 ? Math.round(sum / count) : 0,
+      ]),
+    ) as Record<ComponentKey, number>;
+
+    // Top performers (top 3 by latest overall)
+    const topPerformers = [...latestPerStudent]
+      .sort((a, b) => b.latest.overall - a.latest.overall)
+      .slice(0, 3)
+      .map((s) => ({
+        userId: s.userId,
+        name: s.name,
+        overall: s.latest.overall,
+        band: s.latest.band,
+      }));
+
+    // Most improved (top 3 by delta between latest and previous)
+    const mostImproved = latestPerStudent
+      .filter((s) => s.previous)
+      .map((s) => ({
+        userId: s.userId,
+        name: s.name,
+        delta: s.latest.overall - s.previous!.overall,
+      }))
+      .sort((a, b) => b.delta - a.delta)
+      .slice(0, 3);
+
+    // Students needing attention
+    const threeWeeksAgo = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000);
+    const attention: {
+      userId: string;
+      name: string;
+      reason: "regressing" | "below_c1" | "inactive" | "incomplete";
+      detail: string;
+      overall: number;
+    }[] = [];
+
+    for (const s of latestPerStudent) {
+      const delta = s.previous
+        ? s.latest.overall - s.previous.overall
+        : null;
+
+      // Regressing: dropped 5+ points
+      if (delta !== null && delta <= -5) {
+        attention.push({
+          userId: s.userId,
+          name: s.name,
+          reason: "regressing",
+          detail: `Latest: ${s.latest.overall} — dropped ${Math.abs(delta)} pts`,
+          overall: s.latest.overall,
+        });
+        continue;
+      }
+
+      // Below C1
+      if (s.latest.overall < 180 && s.latest.overall > 0) {
+        attention.push({
+          userId: s.userId,
+          name: s.name,
+          reason: "below_c1",
+          detail: `Latest: ${s.latest.overall} — consistently below C1`,
+          overall: s.latest.overall,
+        });
+        continue;
+      }
+
+      // Inactive — check the raw examDate from the latest score
+      const latestDate = byStudent.get(s.userId)?.scores[0]?.examDate;
+      if (latestDate && latestDate < threeWeeksAgo) {
+        attention.push({
+          userId: s.userId,
+          name: s.name,
+          reason: "inactive",
+          detail: "No scores logged in 3+ weeks",
+          overall: s.latest.overall,
+        });
+        continue;
+      }
+
+      // Incomplete (less than 4 skills in latest)
+      if (s.latest.included < 4) {
+        attention.push({
+          userId: s.userId,
+          name: s.name,
+          reason: "incomplete",
+          detail: `Only ${s.latest.included} of 5 skills entered`,
+          overall: s.latest.overall,
+        });
+      }
+    }
+
+    // Class progress over time — monthly averages
+    const monthlyMap = new Map<string, number[]>();
+    for (const score of allScores) {
+      if (ctx.userId && score.userId === ctx.userId) continue;
+      const key = `${score.examDate.getFullYear()}-${String(score.examDate.getMonth() + 1).padStart(2, "0")}`;
+      const arr = monthlyMap.get(key) ?? [];
+      arr.push(enrichScore(score).overall);
+      monthlyMap.set(key, arr);
+    }
+    const classProgress = [...monthlyMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, overalls]) => ({
+        month,
+        average: Math.round(
+          overalls.reduce((a, b) => a + b, 0) / overalls.length,
+        ),
+      }));
+
+    return {
+      totalStudents,
+      classAverage,
+      passRate,
+      passing,
+      avgCompletion,
+      bandDistribution,
+      skillAverages,
+      topPerformers,
+      mostImproved,
+      attention,
+      classProgress,
+    };
   }),
 
   studentProgress: teacherProcedure
