@@ -13,6 +13,7 @@ import {
   type ComponentKey,
   type ScaleScoreMap,
 } from "~/lib/scoring";
+import { determineAttention, REASON_ORDER } from "~/lib/attention";
 
 const createScoreInput = z.object({
   examDate: z.date(),
@@ -168,6 +169,28 @@ export const scoreRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  deleteAsTeacher: teacherProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.orgId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No active organization",
+        });
+      }
+
+      const existing = await ctx.db.scoreLog.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!existing || existing.organizationId !== ctx.orgId) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      await ctx.db.scoreLog.delete({ where: { id: input.id } });
+      return { success: true };
+    }),
+
   latestByStudent: teacherProcedure.query(async ({ ctx }) => {
     if (!ctx.orgId) {
       throw new TRPCError({
@@ -176,38 +199,45 @@ export const scoreRouter = createTRPCRouter({
       });
     }
 
-    // Get the 2 most recent scores per student for delta calculation
     const allScores = await ctx.db.scoreLog.findMany({
       where: { organizationId: ctx.orgId },
       orderBy: { examDate: "desc" },
     });
 
-    const byStudent = new Map<string, typeof allScores>();
-    for (const score of allScores) {
+    // Filter out the teacher
+    const studentScores = allScores.filter((s) => s.userId !== ctx.userId);
+
+    const mostRecentExamDate = studentScores[0]?.examDate ?? new Date();
+
+    const byStudent = new Map<string, typeof studentScores>();
+    for (const score of studentScores) {
       const existing = byStudent.get(score.userId) ?? [];
-      if (existing.length < 2) {
-        existing.push(score);
-        byStudent.set(score.userId, existing);
-      }
+      existing.push(score);
+      byStudent.set(score.userId, existing);
     }
 
-    const result: Record<
+    type EnrichedResult = ReturnType<typeof enrichScore> & { examDate: Date };
+    const students: Record<
       string,
-      { latest: ReturnType<typeof enrichScore>; previous?: ReturnType<typeof enrichScore> }
+      { latest: EnrichedResult; previous?: EnrichedResult; allScores: EnrichedResult[] }
     > = {};
 
     for (const [userId, scores] of byStudent) {
       const latest = scores[0];
-      const previous = scores[1];
       if (latest) {
-        result[userId] = {
-          latest: enrichScore(latest),
-          previous: previous ? enrichScore(previous) : undefined,
+        const enrichedScores = scores.map((s) => ({
+          ...enrichScore(s),
+          examDate: s.examDate,
+        }));
+        students[userId] = {
+          latest: enrichedScores[0]!,
+          previous: enrichedScores[1],
+          allScores: enrichedScores,
         };
       }
     }
 
-    return result;
+    return { students, mostRecentExamDate };
   }),
 
   dashboard: teacherProcedure.query(async ({ ctx }) => {
@@ -333,8 +363,8 @@ export const scoreRouter = createTRPCRouter({
       .sort((a, b) => b.delta - a.delta)
       .slice(0, 3);
 
-    // Students needing attention — prioritized, one flag per student
-    const fourWeeksAgo = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
+    // Students needing attention — using shared logic
+    const mostRecentOrgDate = allScores[0]?.examDate ?? new Date();
     const attention: {
       userId: string;
       name: string;
@@ -344,71 +374,25 @@ export const scoreRouter = createTRPCRouter({
     }[] = [];
 
     for (const s of latestPerStudent) {
-      const delta = s.previous
-        ? s.latest.overall - s.previous.overall
-        : null;
-
-      // Regressing: dropped 10+ points between exams
-      if (delta !== null && delta <= -10) {
-        attention.push({
-          userId: s.userId,
-          name: s.name,
-          reason: "regressing",
-          detail: `Latest: ${s.latest.overall} — dropped ${Math.abs(delta)} pts`,
-          overall: s.latest.overall,
-        });
-        continue;
-      }
-
-      // Below pass: under 200 (C2 pass threshold) with at least 2 exams
       const studentScores = byStudent.get(s.userId)?.scores ?? [];
-      if (
-        s.latest.overall < 200 &&
-        s.latest.overall > 0 &&
-        studentScores.length >= 2 &&
-        studentScores.slice(0, 2).every((sc) => sc.overall < 200)
-      ) {
+      const flag = determineAttention(
+        s.latest,
+        s.previous,
+        studentScores,
+        mostRecentOrgDate,
+      );
+      if (flag) {
         attention.push({
           userId: s.userId,
           name: s.name,
-          reason: "below_pass",
-          detail: `Latest: ${s.latest.overall} — below C2 pass mark`,
-          overall: s.latest.overall,
-        });
-        continue;
-      }
-
-      // Inactive: no scores in 4+ weeks
-      const latestDate = byStudent.get(s.userId)?.scores[0]?.examDate;
-      if (latestDate && latestDate < fourWeeksAgo) {
-        attention.push({
-          userId: s.userId,
-          name: s.name,
-          reason: "inactive",
-          detail: "No scores logged in 4+ weeks",
-          overall: s.latest.overall,
-        });
-        continue;
-      }
-
-      // Incomplete: last 2 exams both have fewer than 3 skills
-      if (
-        studentScores.length >= 2 &&
-        studentScores.slice(0, 2).every((sc) => sc.included < 3)
-      ) {
-        attention.push({
-          userId: s.userId,
-          name: s.name,
-          reason: "incomplete",
-          detail: `Only ${s.latest.included} of 5 skills in recent exams`,
+          reason: flag.reason,
+          detail: flag.detail,
           overall: s.latest.overall,
         });
       }
     }
 
-    // Sort attention: regressing first, then below_pass, inactive, incomplete
-    const reasonOrder = { regressing: 0, below_pass: 1, inactive: 2, incomplete: 3 };
-    attention.sort((a, b) => reasonOrder[a.reason] - reasonOrder[b.reason]);
+    attention.sort((a, b) => REASON_ORDER[a.reason] - REASON_ORDER[b.reason]);
 
     // Class progress over time — monthly averages
     const monthlyMap = new Map<string, number[]>();
@@ -461,5 +445,161 @@ export const scoreRouter = createTRPCRouter({
       });
 
       return scores.map(enrichScore);
+    }),
+
+  studentList: teacherProcedure
+    .input(
+      z.object({
+        search: z.string().optional(),
+        band: z
+          .enum([
+            "all",
+            "Grade A",
+            "Grade B",
+            "Grade C",
+            "Level C1",
+            "No certificate",
+          ])
+          .optional(),
+        attention: z.boolean().optional(),
+        sort: z.enum(["name", "overall", "date"]).optional().default("name"),
+        sortDir: z.enum(["asc", "desc"]).optional().default("asc"),
+        page: z.number().int().min(1).optional().default(1),
+        pageSize: z.number().int().min(1).max(50).optional().default(20),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      if (!ctx.orgId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No active organization",
+        });
+      }
+
+      // 1. Find student IDs in this org (exclude teacher)
+      const orgScores = await ctx.db.scoreLog.findMany({
+        where: { organizationId: ctx.orgId },
+        select: { userId: true },
+        distinct: ["userId"],
+      });
+      const studentIds = orgScores
+        .map((s) => s.userId)
+        .filter((id) => id !== ctx.userId);
+
+      // 2. Query users — DB-level search
+      const users = await ctx.db.user.findMany({
+        where: {
+          clerkId: { in: studentIds },
+          ...(input.search
+            ? {
+                OR: [
+                  { name: { contains: input.search, mode: "insensitive" } },
+                  { email: { contains: input.search, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
+      });
+
+      // 3. Fetch all scores for matched students
+      const matchedIds = users.map((u) => u.clerkId);
+      const allScores = await ctx.db.scoreLog.findMany({
+        where: {
+          organizationId: ctx.orgId,
+          userId: { in: matchedIds },
+        },
+        orderBy: { examDate: "desc" },
+      });
+
+      const mostRecentExamDate = allScores[0]?.examDate ?? new Date();
+
+      // 4. Group by student and enrich
+      const scoresByStudent = new Map<string, typeof allScores>();
+      for (const score of allScores) {
+        const existing = scoresByStudent.get(score.userId) ?? [];
+        existing.push(score);
+        scoresByStudent.set(score.userId, existing);
+      }
+
+      type EnrichedWithDate = ReturnType<typeof enrichScore> & {
+        examDate: Date;
+      };
+
+      const userMap = new Map(users.map((u) => [u.clerkId, u]));
+
+      let enrichedStudents = matchedIds.map((userId) => {
+        const user = userMap.get(userId)!;
+        const scores = scoresByStudent.get(userId) ?? [];
+        const enrichedScores: EnrichedWithDate[] = scores.map((s) => ({
+          ...enrichScore(s),
+          examDate: s.examDate,
+        }));
+        const latest = enrichedScores[0];
+        const previous = enrichedScores[1];
+        const delta =
+          latest && previous ? latest.overall - previous.overall : null;
+        const attentionFlag = latest
+          ? determineAttention(
+              latest,
+              previous,
+              enrichedScores,
+              mostRecentExamDate,
+            )
+          : null;
+
+        return {
+          userId,
+          name: user.name ?? "Unnamed",
+          email: user.email,
+          latest,
+          previous,
+          allScores: enrichedScores,
+          delta,
+          attention: attentionFlag,
+        };
+      });
+
+      // 5. Apply band filter
+      if (input.band && input.band !== "all") {
+        enrichedStudents = enrichedStudents.filter(
+          (s) => s.latest?.band.label === input.band,
+        );
+      }
+
+      // 6. Apply attention filter
+      if (input.attention) {
+        enrichedStudents = enrichedStudents.filter(
+          (s) => s.attention !== null,
+        );
+      }
+
+      // 7. Sort
+      const dir = input.sortDir === "desc" ? -1 : 1;
+      enrichedStudents.sort((a, b) => {
+        switch (input.sort) {
+          case "overall":
+            return dir * ((a.latest?.overall ?? 0) - (b.latest?.overall ?? 0));
+          case "date": {
+            const aTime = a.allScores[0]?.examDate
+              ? new Date(a.allScores[0].examDate).getTime()
+              : 0;
+            const bTime = b.allScores[0]?.examDate
+              ? new Date(b.allScores[0].examDate).getTime()
+              : 0;
+            return dir * (aTime - bTime);
+          }
+          default: // "name"
+            return dir * a.name.localeCompare(b.name);
+        }
+      });
+
+      // 8. Paginate
+      const total = enrichedStudents.length;
+      const totalPages = Math.max(1, Math.ceil(total / input.pageSize));
+      const page = Math.min(input.page, totalPages);
+      const skip = (page - 1) * input.pageSize;
+      const students = enrichedStudents.slice(skip, skip + input.pageSize);
+
+      return { students, total, page, pageSize: input.pageSize, totalPages };
     }),
 });

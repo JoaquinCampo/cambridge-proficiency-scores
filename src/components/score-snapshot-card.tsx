@@ -1,5 +1,5 @@
 import { BandBadge } from "./band-badge";
-import { Pencil, Trash2, MessageSquareText } from "lucide-react";
+import { Pencil, Trash2, MessageSquareText, List } from "lucide-react";
 import type { ComponentKey } from "~/lib/scoring";
 
 const skillConfig: Record<ComponentKey, { label: string; color: string }> = {
@@ -19,6 +19,9 @@ export function ScoreSnapshotCard({
   scaleScores,
   included,
   notes,
+  onEdit,
+  onDelete,
+  onViewAll,
 }: {
   overall: number;
   band: { label: string };
@@ -26,6 +29,9 @@ export function ScoreSnapshotCard({
   scaleScores: ScaleScores;
   included: number;
   notes?: string | null;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onViewAll?: () => void;
 }) {
   const dateStr = new Date(examDate).toLocaleDateString("en-US", {
     month: "long",
@@ -100,12 +106,25 @@ export function ScoreSnapshotCard({
           )}
         </div>
         <div className="flex items-center gap-1">
-          <button className="rounded p-1 hover:bg-[var(--secondary)]">
-            <Pencil className="h-4 w-4 text-[var(--muted-foreground)]" />
-          </button>
-          <button className="rounded p-1 hover:bg-[var(--secondary)]">
-            <Trash2 className="h-4 w-4 text-[var(--muted-foreground)]" />
-          </button>
+          {onViewAll && (
+            <button
+              onClick={onViewAll}
+              className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--secondary)] hover:text-[var(--foreground)]"
+            >
+              <List className="h-3.5 w-3.5" />
+              All entries
+            </button>
+          )}
+          {onEdit && (
+            <button onClick={onEdit} className="rounded p-1 hover:bg-[var(--secondary)]">
+              <Pencil className="h-4 w-4 text-[var(--muted-foreground)]" />
+            </button>
+          )}
+          {onDelete && (
+            <button onClick={onDelete} className="rounded p-1 hover:bg-[var(--secondary)]">
+              <Trash2 className="h-4 w-4 text-[var(--muted-foreground)]" />
+            </button>
+          )}
         </div>
       </div>
     </div>

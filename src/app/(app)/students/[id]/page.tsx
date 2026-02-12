@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { api } from "~/trpc/react";
@@ -10,7 +10,18 @@ import { SkillSpotlightCard } from "~/components/skill-spotlight-card";
 import { OverallChart } from "~/components/overall-chart";
 import { SkillProgressChart } from "~/components/skill-progress-chart";
 import { ScaleReferenceBar } from "~/components/scale-reference-bar";
+import { ScoreHistoryTable } from "~/components/score-history-table";
+import { ConfirmDeleteDialog } from "~/components/confirm-delete-dialog";
 import type { ComponentKey } from "~/lib/scoring";
+
+type ScoreEntry = {
+  id: string;
+  examDate: Date;
+  scaleScores: Partial<Record<ComponentKey, number>>;
+  overall: number;
+  band: { label: string };
+  notes?: string | null;
+};
 
 export default function StudentDetailPage({
   params,
@@ -18,11 +29,23 @@ export default function StudentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const utils = api.useUtils();
+  const historyRef = useRef<HTMLDivElement>(null);
+
   const { data: user, isLoading: userLoading } = api.user.get.useQuery({
     userId: id,
   });
   const { data: scores, isLoading: scoresLoading } =
     api.score.studentProgress.useQuery({ studentId: id });
+
+  const [deletingScore, setDeletingScore] = useState<ScoreEntry | null>(null);
+
+  const deleteMutation = api.score.deleteAsTeacher.useMutation({
+    onSuccess: () => {
+      setDeletingScore(null);
+      void utils.score.studentProgress.invalidate({ studentId: id });
+    },
+  });
 
   const isLoading = userLoading || scoresLoading;
 
@@ -36,6 +59,9 @@ export default function StudentDetailPage({
 
   const latest = scores && scores.length > 0 ? scores[scores.length - 1] : undefined;
   const previous = scores && scores.length >= 2 ? scores[scores.length - 2] : undefined;
+
+  // Scores come in asc order from studentProgress; reverse for table (newest first)
+  const tableScores = scores ? [...scores].reverse() : [];
 
   const overallData = (scores ?? []).map((s) => ({
     date: new Date(s.examDate).toLocaleDateString("en-US", {
@@ -56,6 +82,10 @@ export default function StudentDetailPage({
       ).map((key) => [key, s.scaleScores[key] ?? undefined]),
     ),
   }));
+
+  const scrollToHistory = () => {
+    historyRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   return (
     <>
@@ -97,6 +127,7 @@ export default function StudentDetailPage({
               scaleScores={latest.scaleScores}
               included={latest.included}
               notes={latest.notes}
+              onViewAll={scrollToHistory}
             />
             <ProgressDeltaCard
               overall={latest.overall}
@@ -112,8 +143,35 @@ export default function StudentDetailPage({
           <OverallChart data={overallData} />
           <SkillProgressChart data={skillData} />
           <ScaleReferenceBar />
+
+          {/* Score history */}
+          <div ref={historyRef}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-[var(--foreground)]">
+                Score History
+              </h2>
+              <span className="text-xs text-[var(--muted-foreground)]">
+                {tableScores.length} entry{tableScores.length !== 1 ? "ies" : "y"}
+              </span>
+            </div>
+            <ScoreHistoryTable
+              scores={tableScores as unknown as ScoreEntry[]}
+              onDelete={(score) => setDeletingScore(score)}
+            />
+          </div>
         </div>
       )}
+
+      {/* Delete confirmation */}
+      <ConfirmDeleteDialog
+        open={!!deletingScore}
+        onOpenChange={(open) => !open && setDeletingScore(null)}
+        examDate={deletingScore?.examDate}
+        isDeleting={deleteMutation.isPending}
+        onConfirm={() =>
+          deletingScore && deleteMutation.mutate({ id: deletingScore.id })
+        }
+      />
     </>
   );
 }

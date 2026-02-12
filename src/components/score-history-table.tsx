@@ -26,7 +26,7 @@ function RowMenu({
   onEdit,
   onDelete,
 }: {
-  onEdit: () => void;
+  onEdit?: () => void;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -50,12 +50,14 @@ function RowMenu({
       </button>
       {open && (
         <div className="absolute right-0 top-8 z-10 w-32 rounded-[var(--radius-m)] border border-[var(--border)] bg-[var(--card)] py-1 shadow-lg">
-          <button
-            onClick={() => { onEdit(); setOpen(false); }}
-            className="w-full px-3 py-1.5 text-left text-sm hover:bg-[var(--secondary)]"
-          >
-            Edit
-          </button>
+          {onEdit && (
+            <button
+              onClick={() => { onEdit(); setOpen(false); }}
+              className="w-full px-3 py-1.5 text-left text-sm hover:bg-[var(--secondary)]"
+            >
+              Edit
+            </button>
+          )}
           <button
             onClick={() => { onDelete(); setOpen(false); }}
             className="w-full px-3 py-1.5 text-left text-sm text-[var(--destructive)] hover:bg-[var(--secondary)]"
@@ -74,7 +76,7 @@ export function ScoreHistoryTable({
   onDelete,
 }: {
   scores: EnrichedScore[];
-  onEdit: (score: EnrichedScore) => void;
+  onEdit?: (score: EnrichedScore) => void;
   onDelete: (score: EnrichedScore) => void;
 }) {
   return (
@@ -140,7 +142,7 @@ export function ScoreHistoryTable({
           </div>
           <div className="flex w-[60px] justify-end pr-4">
             <RowMenu
-              onEdit={() => onEdit(score)}
+              onEdit={onEdit ? () => onEdit(score) : undefined}
               onDelete={() => onDelete(score)}
             />
           </div>
