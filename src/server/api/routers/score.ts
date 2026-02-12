@@ -271,18 +271,10 @@ export const scoreRouter = createTRPCRouter({
           )
         : 0;
 
-    // Pass rate (C1+ = overall >= 180)
-    const passing = latestOveralls.filter((o) => o >= 180).length;
+    // Pass rate (C2 pass = overall >= 200, i.e. Grade A/B/C)
+    const passing = latestOveralls.filter((o) => o >= 200).length;
     const passRate =
       totalStudents > 0 ? Math.round((passing / totalStudents) * 100) : 0;
-
-    // Average completion (skills per exam, across ALL scores)
-    const allEnriched = [...byStudent.values()].flatMap((s) => s.scores);
-    const totalIncluded = allEnriched.reduce((sum, s) => sum + s.included, 0);
-    const avgCompletion =
-      allEnriched.length > 0
-        ? +(totalIncluded / allEnriched.length).toFixed(1)
-        : 0;
 
     // Band distribution (from latest scores)
     const bandDistribution = { A: 0, B: 0, C: 0, C1: 0, below: 0 };
@@ -341,12 +333,12 @@ export const scoreRouter = createTRPCRouter({
       .sort((a, b) => b.delta - a.delta)
       .slice(0, 3);
 
-    // Students needing attention
-    const threeWeeksAgo = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000);
+    // Students needing attention — prioritized, one flag per student
+    const fourWeeksAgo = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
     const attention: {
       userId: string;
       name: string;
-      reason: "regressing" | "below_c1" | "inactive" | "incomplete";
+      reason: "regressing" | "below_pass" | "inactive" | "incomplete";
       detail: string;
       overall: number;
     }[] = [];
@@ -356,8 +348,8 @@ export const scoreRouter = createTRPCRouter({
         ? s.latest.overall - s.previous.overall
         : null;
 
-      // Regressing: dropped 5+ points
-      if (delta !== null && delta <= -5) {
+      // Regressing: dropped 10+ points between exams
+      if (delta !== null && delta <= -10) {
         attention.push({
           userId: s.userId,
           name: s.name,
@@ -368,42 +360,55 @@ export const scoreRouter = createTRPCRouter({
         continue;
       }
 
-      // Below C1
-      if (s.latest.overall < 180 && s.latest.overall > 0) {
+      // Below pass: under 200 (C2 pass threshold) with at least 2 exams
+      const studentScores = byStudent.get(s.userId)?.scores ?? [];
+      if (
+        s.latest.overall < 200 &&
+        s.latest.overall > 0 &&
+        studentScores.length >= 2 &&
+        studentScores.slice(0, 2).every((sc) => sc.overall < 200)
+      ) {
         attention.push({
           userId: s.userId,
           name: s.name,
-          reason: "below_c1",
-          detail: `Latest: ${s.latest.overall} — consistently below C1`,
+          reason: "below_pass",
+          detail: `Latest: ${s.latest.overall} — below C2 pass mark`,
           overall: s.latest.overall,
         });
         continue;
       }
 
-      // Inactive — check the raw examDate from the latest score
+      // Inactive: no scores in 4+ weeks
       const latestDate = byStudent.get(s.userId)?.scores[0]?.examDate;
-      if (latestDate && latestDate < threeWeeksAgo) {
+      if (latestDate && latestDate < fourWeeksAgo) {
         attention.push({
           userId: s.userId,
           name: s.name,
           reason: "inactive",
-          detail: "No scores logged in 3+ weeks",
+          detail: "No scores logged in 4+ weeks",
           overall: s.latest.overall,
         });
         continue;
       }
 
-      // Incomplete (less than 4 skills in latest)
-      if (s.latest.included < 4) {
+      // Incomplete: last 2 exams both have fewer than 3 skills
+      if (
+        studentScores.length >= 2 &&
+        studentScores.slice(0, 2).every((sc) => sc.included < 3)
+      ) {
         attention.push({
           userId: s.userId,
           name: s.name,
           reason: "incomplete",
-          detail: `Only ${s.latest.included} of 5 skills entered`,
+          detail: `Only ${s.latest.included} of 5 skills in recent exams`,
           overall: s.latest.overall,
         });
       }
     }
+
+    // Sort attention: regressing first, then below_pass, inactive, incomplete
+    const reasonOrder = { regressing: 0, below_pass: 1, inactive: 2, incomplete: 3 };
+    attention.sort((a, b) => reasonOrder[a.reason] - reasonOrder[b.reason]);
 
     // Class progress over time — monthly averages
     const monthlyMap = new Map<string, number[]>();
@@ -428,7 +433,6 @@ export const scoreRouter = createTRPCRouter({
       classAverage,
       passRate,
       passing,
-      avgCompletion,
       bandDistribution,
       skillAverages,
       topPerformers,

@@ -5,7 +5,6 @@ import {
   Users,
   ChartNoAxesColumn,
   GraduationCap,
-  ClipboardCheck,
   Trophy,
   TrendingUp,
   TrendingDown,
@@ -70,8 +69,8 @@ const REASON_CONFIG: Record<
     text: "var(--destructive)",
     Icon: TrendingDown,
   },
-  below_c1: {
-    label: "Below C1",
+  below_pass: {
+    label: "Below Pass",
     bg: "rgba(148,163,184,0.1)",
     text: "var(--band-below-c1)",
     Icon: CircleAlert,
@@ -127,7 +126,7 @@ export default function DashboardPage() {
       />
 
       {/* Stats Row */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <StatCard
           label="Total Students"
           value={String(data.totalStudents)}
@@ -141,16 +140,10 @@ export default function DashboardPage() {
           icon={<ChartNoAxesColumn className="h-5 w-5" />}
         />
         <StatCard
-          label="Pass Rate (C1+)"
+          label="C2 Pass Rate"
           value={`${data.passRate}%`}
-          subtext={`${data.passing} of ${data.totalStudents} students`}
+          subtext={`${data.passing} of ${data.totalStudents} scoring 200+`}
           icon={<GraduationCap className="h-5 w-5" />}
-        />
-        <StatCard
-          label="Avg Completion"
-          value={String(data.avgCompletion)}
-          subtext="skills per exam"
-          icon={<ClipboardCheck className="h-5 w-5" />}
         />
       </div>
 
@@ -328,7 +321,7 @@ export default function DashboardPage() {
                           backgroundColor:
                             s.reason === "regressing"
                               ? "var(--destructive)"
-                              : s.reason === "below_c1"
+                              : s.reason === "below_pass"
                                 ? "var(--band-below-c1)"
                                 : s.reason === "inactive"
                                   ? "var(--band-c1)"
