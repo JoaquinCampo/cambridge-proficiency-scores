@@ -5,18 +5,25 @@
 ### Student
 
 1. **Sign in** with Google via Clerk.
-2. **Enter exam scores** — log raw marks for one or more of the 5 skills per exam attempt. Specify the exam date.
-3. **View own progress** — charts showing improvement over time:
-   - **Overall progress**: Line chart. X-axis = time, Y-axis = exam percentage (0–100%).
+2. **Accept organization invitation** — join teacher's org from the /no-group page.
+3. **Wait for group assignment** — cannot log scores until assigned to a group by the teacher.
+4. **Enter exam scores** — log raw marks for one or more of the 5 skills per exam attempt. Specify the exam date. Scores are stamped with the student's active group.
+5. **View own progress** — charts showing improvement over time (all history, across all groups):
+   - **Overall progress**: Line chart. X-axis = time, Y-axis = Cambridge Scale (162–230).
    - **Per-skill breakdown**: Each of the 5 skills plotted over time (line or bar chart).
-4. **See score history** — list of past exam entries with raw scores, scale scores, percentages, and band.
+6. **See score history** — list of past exam entries with raw scores, scale scores, and band.
+7. **Edit/delete only active group scores** — scores from previous groups are locked.
 
 ### Teacher
 
 1. **Sign in** with Google via Clerk.
-2. **See student list** — all students in their assigned groups/organizations.
-3. **View individual student progress** — same charts as the student sees, possibly with additional insight.
-4. **Dashboard** — aggregate metrics across students in a group (details TBD in a later iteration).
+2. **Manage groups** — create, rename, delete groups within their organization.
+3. **Invite students** — send email invitations to join the organization via Clerk.
+4. **Assign students to groups** — place ungrouped students into a group; move students between groups.
+5. **See student list** — all students in a group or across all groups, with filtering/sorting.
+6. **View individual student progress** — same charts as the student sees, with teacher-level context.
+7. **Dashboard** — aggregate metrics for a selected group or all students (band distribution, class average, attention flags, skill averages, progress over time).
+8. **Group switching** — dropdown to switch between groups on dashboard and student list pages. "All Students" shows org-wide data.
 
 ## Charts
 
@@ -41,9 +48,10 @@
 - UI design is **deferred** to later iterations.
 - Current dark theme and shadcn/ui components will be the foundation.
 - Pages to build (structure only, design later):
-  - `/` — Landing/welcome after login
-  - `/scores` — Score entry + history (student)
+  - `/` — Landing/welcome after login (students: score entry + history)
   - `/progress` — Progress charts (student)
-  - `/students` — Student list (teacher)
+  - `/dashboard` — Group metrics with group selector dropdown (teacher)
+  - `/students` — Student list with group filter (teacher)
   - `/students/[id]` — Individual student progress (teacher)
-  - `/dashboard` — Group metrics (teacher)
+  - `/groups` — Group management: CRUD groups, assign students, invite (teacher)
+  - `/no-group` — Shown to authenticated users without an org or without an active group

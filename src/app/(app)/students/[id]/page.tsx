@@ -12,6 +12,7 @@ import { SkillProgressChart } from "~/components/skill-progress-chart";
 import { ScaleReferenceBar } from "~/components/scale-reference-bar";
 import { ScoreHistoryTable } from "~/components/score-history-table";
 import { ConfirmDeleteDialog } from "~/components/confirm-delete-dialog";
+import { StatCardsSkeleton, CardSkeleton } from "~/components/skeleton";
 import type { ComponentKey } from "~/lib/scoring";
 
 type ScoreEntry = {
@@ -51,8 +52,17 @@ export default function StudentDetailPage({
 
   if (isLoading) {
     return (
-      <div className="py-6">
-        <p className="text-sm text-[var(--muted-foreground)]">Loading...</p>
+      <div className="flex flex-col gap-6 py-6">
+        <div className="flex items-center gap-4">
+          <div className="skeleton h-9 w-9 rounded-full" />
+          <div className="flex flex-col gap-1.5">
+            <div className="skeleton skeleton-heading" />
+            <div className="skeleton skeleton-text w-40" />
+          </div>
+        </div>
+        <StatCardsSkeleton />
+        <CardSkeleton height={300} />
+        <CardSkeleton height={300} />
       </div>
     );
   }
@@ -98,7 +108,7 @@ export default function StudentDetailPage({
           <ArrowLeft className="h-5 w-5 text-[var(--muted-foreground)]" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">
+          <h1 className="font-display text-[26px] font-bold tracking-tight text-[var(--foreground)]">
             {user?.name ?? "Student"}
           </h1>
           <p className="text-sm text-[var(--muted-foreground)]">

@@ -31,7 +31,7 @@ export function SkillSpotlightCard({
       <div className="flex items-center gap-3.5 px-6 py-5">
         <div
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-          style={{ backgroundColor: "rgba(22,163,74,0.1)" }}
+          style={{ backgroundColor: "rgba(5,150,105,0.1)" }}
         >
           <ArrowUp className="h-[18px] w-[18px]" style={{ color: "var(--band-grade-a)" }} />
         </div>
@@ -55,7 +55,7 @@ export function SkillSpotlightCard({
       <div className="flex items-center gap-3.5 px-6 py-5">
         <div
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-          style={{ backgroundColor: "rgba(220,38,38,0.1)" }}
+          style={{ backgroundColor: "rgba(185,28,28,0.1)" }}
         >
           <Target className="h-[18px] w-[18px]" style={{ color: "var(--destructive)" }} />
         </div>

@@ -51,6 +51,11 @@ const updateScoreInput = z.object({
   notes: z.string().max(500).optional().nullable(),
 });
 
+/** Optional groupId filter used by all teacher queries */
+const groupFilter = z.object({
+  groupId: z.string().optional(),
+});
+
 function enrichScore<
   T extends {
     reading: number | null;
@@ -88,6 +93,14 @@ function enrichScore<
   };
 }
 
+/** Build the where clause for teacher queries, optionally scoped to a group */
+function teacherScoreWhere(orgId: string, groupId?: string) {
+  return {
+    organizationId: orgId,
+    ...(groupId ? { groupId } : {}),
+  };
+}
+
 export const scoreRouter = createTRPCRouter({
   create: protectedProcedure
     .input(createScoreInput)
@@ -99,10 +112,28 @@ export const scoreRouter = createTRPCRouter({
         });
       }
 
+      // Find the student's active group in this org
+      const activeMembership = await ctx.db.groupMember.findFirst({
+        where: {
+          userId: ctx.userId,
+          active: true,
+          group: { organizationId: ctx.orgId },
+        },
+      });
+
+      if (!activeMembership) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "You must be assigned to a group before logging scores. Ask your teacher to add you to a group.",
+        });
+      }
+
       const score = await ctx.db.scoreLog.create({
         data: {
           userId: ctx.userId,
           organizationId: ctx.orgId,
+          groupId: activeMembership.groupId,
           examDate: input.examDate,
           reading: input.reading,
           useOfEnglish: input.useOfEnglish,
@@ -141,8 +172,26 @@ export const scoreRouter = createTRPCRouter({
         where: { id: input.id },
       });
 
-      if (!existing || existing.userId !== ctx.userId) {
+      if (existing?.userId !== ctx.userId) {
         throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      // Only allow editing scores from the student's active group
+      if (existing.groupId) {
+        const activeMembership = await ctx.db.groupMember.findFirst({
+          where: {
+            userId: ctx.userId,
+            active: true,
+            groupId: existing.groupId,
+          },
+        });
+
+        if (!activeMembership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You can only edit scores from your current group",
+          });
+        }
       }
 
       const { id, ...data } = input;
@@ -161,8 +210,26 @@ export const scoreRouter = createTRPCRouter({
         where: { id: input.id },
       });
 
-      if (!existing || existing.userId !== ctx.userId) {
+      if (existing?.userId !== ctx.userId) {
         throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      // Only allow deleting scores from the student's active group
+      if (existing.groupId) {
+        const activeMembership = await ctx.db.groupMember.findFirst({
+          where: {
+            userId: ctx.userId,
+            active: true,
+            groupId: existing.groupId,
+          },
+        });
+
+        if (!activeMembership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You can only delete scores from your current group",
+          });
+        }
       }
 
       await ctx.db.scoreLog.delete({ where: { id: input.id } });
@@ -183,7 +250,7 @@ export const scoreRouter = createTRPCRouter({
         where: { id: input.id },
       });
 
-      if (!existing || existing.organizationId !== ctx.orgId) {
+      if (existing?.organizationId !== ctx.orgId) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
 
@@ -191,243 +258,262 @@ export const scoreRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  latestByStudent: teacherProcedure.query(async ({ ctx }) => {
-    if (!ctx.orgId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "No active organization",
-      });
-    }
-
-    const allScores = await ctx.db.scoreLog.findMany({
-      where: { organizationId: ctx.orgId },
-      orderBy: { examDate: "desc" },
-    });
-
-    // Filter out the teacher
-    const studentScores = allScores.filter((s) => s.userId !== ctx.userId);
-
-    const mostRecentExamDate = studentScores[0]?.examDate ?? new Date();
-
-    const byStudent = new Map<string, typeof studentScores>();
-    for (const score of studentScores) {
-      const existing = byStudent.get(score.userId) ?? [];
-      existing.push(score);
-      byStudent.set(score.userId, existing);
-    }
-
-    type EnrichedResult = ReturnType<typeof enrichScore> & { examDate: Date };
-    const students: Record<
-      string,
-      { latest: EnrichedResult; previous?: EnrichedResult; allScores: EnrichedResult[] }
-    > = {};
-
-    for (const [userId, scores] of byStudent) {
-      const latest = scores[0];
-      if (latest) {
-        const enrichedScores = scores.map((s) => ({
-          ...enrichScore(s),
-          examDate: s.examDate,
-        }));
-        students[userId] = {
-          latest: enrichedScores[0]!,
-          previous: enrichedScores[1],
-          allScores: enrichedScores,
-        };
-      }
-    }
-
-    return { students, mostRecentExamDate };
-  }),
-
-  dashboard: teacherProcedure.query(async ({ ctx }) => {
-    if (!ctx.orgId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "No active organization",
-      });
-    }
-
-    const allScores = await ctx.db.scoreLog.findMany({
-      where: { organizationId: ctx.orgId },
-      orderBy: { examDate: "desc" },
-      include: { user: true },
-    });
-
-    // Group by student — keep examDate alongside enriched data
-    type EnrichedWithDate = ReturnType<typeof enrichScore> & {
-      examDate: Date;
-    };
-    const byStudent = new Map<
-      string,
-      { name: string; scores: EnrichedWithDate[] }
-    >();
-    for (const score of allScores) {
-      const enriched = {
-        ...enrichScore(score),
-        examDate: score.examDate,
-      };
-      const existing = byStudent.get(score.userId);
-      if (existing) {
-        existing.scores.push(enriched);
-      } else {
-        byStudent.set(score.userId, {
-          name: score.user.name ?? "Unknown",
-          scores: [enriched],
+  latestByStudent: teacherProcedure
+    .input(groupFilter)
+    .query(async ({ ctx, input }) => {
+      if (!ctx.orgId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No active organization",
         });
       }
-    }
 
-    // Filter out the teacher
-    if (ctx.userId) byStudent.delete(ctx.userId);
+      const allScores = await ctx.db.scoreLog.findMany({
+        where: teacherScoreWhere(ctx.orgId, input.groupId),
+        orderBy: { examDate: "desc" },
+      });
 
-    const totalStudents = byStudent.size;
+      // Filter out the teacher
+      const studentScores = allScores.filter((s) => s.userId !== ctx.userId);
 
-    // Latest score per student
-    const latestPerStudent = [...byStudent.entries()].map(
-      ([userId, { name, scores }]) => {
-        const latest = scores[0]!;
-        const previous = scores[1];
-        return { userId, name, latest, previous };
-      },
-    );
+      const mostRecentExamDate = studentScores[0]?.examDate ?? new Date();
 
-    // Class average (from latest scores)
-    const latestOveralls = latestPerStudent.map((s) => s.latest.overall);
-    const classAverage =
-      latestOveralls.length > 0
-        ? Math.round(
-            latestOveralls.reduce((a, b) => a + b, 0) / latestOveralls.length,
-          )
-        : 0;
+      const byStudent = new Map<string, typeof studentScores>();
+      for (const score of studentScores) {
+        const existing = byStudent.get(score.userId) ?? [];
+        existing.push(score);
+        byStudent.set(score.userId, existing);
+      }
 
-    // Pass rate (C2 pass = overall >= 200, i.e. Grade A/B/C)
-    const passing = latestOveralls.filter((o) => o >= 200).length;
-    const passRate =
-      totalStudents > 0 ? Math.round((passing / totalStudents) * 100) : 0;
+      type EnrichedResult = ReturnType<typeof enrichScore> & {
+        examDate: Date;
+      };
+      const students: Record<
+        string,
+        {
+          latest: EnrichedResult;
+          previous?: EnrichedResult;
+          allScores: EnrichedResult[];
+        }
+      > = {};
 
-    // Band distribution (from latest scores)
-    const bandDistribution = { A: 0, B: 0, C: 0, C1: 0, below: 0 };
-    for (const s of latestPerStudent) {
-      const label = s.latest.band.label;
-      if (label === "Grade A") bandDistribution.A++;
-      else if (label === "Grade B") bandDistribution.B++;
-      else if (label === "Grade C") bandDistribution.C++;
-      else if (label === "Level C1") bandDistribution.C1++;
-      else bandDistribution.below++;
-    }
-
-    // Class skill averages (from latest scores only)
-    const skillTotals: Record<ComponentKey, { sum: number; count: number }> = {
-      reading: { sum: 0, count: 0 },
-      useOfEnglish: { sum: 0, count: 0 },
-      writing: { sum: 0, count: 0 },
-      listening: { sum: 0, count: 0 },
-      speaking: { sum: 0, count: 0 },
-    };
-    for (const s of latestPerStudent) {
-      for (const [key, value] of Object.entries(s.latest.scaleScores)) {
-        if (value != null) {
-          const k = key as ComponentKey;
-          skillTotals[k].sum += value;
-          skillTotals[k].count++;
+      for (const [userId, scores] of byStudent) {
+        const latest = scores[0];
+        if (latest) {
+          const enrichedScores = scores.map((s) => ({
+            ...enrichScore(s),
+            examDate: s.examDate,
+          }));
+          students[userId] = {
+            latest: enrichedScores[0]!,
+            previous: enrichedScores[1],
+            allScores: enrichedScores,
+          };
         }
       }
-    }
-    const skillAverages = Object.fromEntries(
-      Object.entries(skillTotals).map(([key, { sum, count }]) => [
-        key,
-        count > 0 ? Math.round(sum / count) : 0,
-      ]),
-    ) as Record<ComponentKey, number>;
 
-    // Top performers (top 3 by latest overall)
-    const topPerformers = [...latestPerStudent]
-      .sort((a, b) => b.latest.overall - a.latest.overall)
-      .slice(0, 3)
-      .map((s) => ({
-        userId: s.userId,
-        name: s.name,
-        overall: s.latest.overall,
-        band: s.latest.band,
-      }));
+      return { students, mostRecentExamDate };
+    }),
 
-    // Most improved (top 3 by delta between latest and previous)
-    const mostImproved = latestPerStudent
-      .filter((s) => s.previous)
-      .map((s) => ({
-        userId: s.userId,
-        name: s.name,
-        delta: s.latest.overall - s.previous!.overall,
-      }))
-      .sort((a, b) => b.delta - a.delta)
-      .slice(0, 3);
-
-    // Students needing attention — using shared logic
-    const mostRecentOrgDate = allScores[0]?.examDate ?? new Date();
-    const attention: {
-      userId: string;
-      name: string;
-      reason: "regressing" | "below_pass" | "inactive" | "incomplete";
-      detail: string;
-      overall: number;
-    }[] = [];
-
-    for (const s of latestPerStudent) {
-      const studentScores = byStudent.get(s.userId)?.scores ?? [];
-      const flag = determineAttention(
-        s.latest,
-        s.previous,
-        studentScores,
-        mostRecentOrgDate,
-      );
-      if (flag) {
-        attention.push({
-          userId: s.userId,
-          name: s.name,
-          reason: flag.reason,
-          detail: flag.detail,
-          overall: s.latest.overall,
+  dashboard: teacherProcedure
+    .input(groupFilter)
+    .query(async ({ ctx, input }) => {
+      if (!ctx.orgId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No active organization",
         });
       }
-    }
 
-    attention.sort((a, b) => REASON_ORDER[a.reason] - REASON_ORDER[b.reason]);
+      const allScores = await ctx.db.scoreLog.findMany({
+        where: teacherScoreWhere(ctx.orgId, input.groupId),
+        orderBy: { examDate: "desc" },
+        include: { user: true },
+      });
 
-    // Class progress over time — monthly averages
-    const monthlyMap = new Map<string, number[]>();
-    for (const score of allScores) {
-      if (ctx.userId && score.userId === ctx.userId) continue;
-      const key = `${score.examDate.getFullYear()}-${String(score.examDate.getMonth() + 1).padStart(2, "0")}`;
-      const arr = monthlyMap.get(key) ?? [];
-      arr.push(enrichScore(score).overall);
-      monthlyMap.set(key, arr);
-    }
-    const classProgress = [...monthlyMap.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, overalls]) => ({
-        month,
-        average: Math.round(
-          overalls.reduce((a, b) => a + b, 0) / overalls.length,
-        ),
-      }));
+      // Group by student — keep examDate alongside enriched data
+      type EnrichedWithDate = ReturnType<typeof enrichScore> & {
+        examDate: Date;
+      };
+      const byStudent = new Map<
+        string,
+        { name: string; scores: EnrichedWithDate[] }
+      >();
+      for (const score of allScores) {
+        const enriched = {
+          ...enrichScore(score),
+          examDate: score.examDate,
+        };
+        const existing = byStudent.get(score.userId);
+        if (existing) {
+          existing.scores.push(enriched);
+        } else {
+          byStudent.set(score.userId, {
+            name: score.user.name ?? "Unknown",
+            scores: [enriched],
+          });
+        }
+      }
 
-    return {
-      totalStudents,
-      classAverage,
-      passRate,
-      passing,
-      bandDistribution,
-      skillAverages,
-      topPerformers,
-      mostImproved,
-      attention,
-      classProgress,
-    };
-  }),
+      // Filter out the teacher
+      if (ctx.userId) byStudent.delete(ctx.userId);
+
+      const totalStudents = byStudent.size;
+
+      // Latest score per student
+      const latestPerStudent = [...byStudent.entries()].map(
+        ([userId, { name, scores }]) => {
+          const latest = scores[0]!;
+          const previous = scores[1];
+          return { userId, name, latest, previous };
+        },
+      );
+
+      // Class average (from latest scores)
+      const latestOveralls = latestPerStudent.map((s) => s.latest.overall);
+      const classAverage =
+        latestOveralls.length > 0
+          ? Math.round(
+              latestOveralls.reduce((a, b) => a + b, 0) /
+                latestOveralls.length,
+            )
+          : 0;
+
+      // Pass rate (C2 pass = overall >= 200, i.e. Grade A/B/C)
+      const passing = latestOveralls.filter((o) => o >= 200).length;
+      const passRate =
+        totalStudents > 0 ? Math.round((passing / totalStudents) * 100) : 0;
+
+      // Band distribution (from latest scores)
+      const bandDistribution = { A: 0, B: 0, C: 0, C1: 0, below: 0 };
+      for (const s of latestPerStudent) {
+        const label = s.latest.band.label;
+        if (label === "Grade A") bandDistribution.A++;
+        else if (label === "Grade B") bandDistribution.B++;
+        else if (label === "Grade C") bandDistribution.C++;
+        else if (label === "Level C1") bandDistribution.C1++;
+        else bandDistribution.below++;
+      }
+
+      // Class skill averages (from latest scores only)
+      const skillTotals: Record<ComponentKey, { sum: number; count: number }> =
+        {
+          reading: { sum: 0, count: 0 },
+          useOfEnglish: { sum: 0, count: 0 },
+          writing: { sum: 0, count: 0 },
+          listening: { sum: 0, count: 0 },
+          speaking: { sum: 0, count: 0 },
+        };
+      for (const s of latestPerStudent) {
+        for (const [key, value] of Object.entries(s.latest.scaleScores)) {
+          if (value != null) {
+            const k = key as ComponentKey;
+            skillTotals[k].sum += value;
+            skillTotals[k].count++;
+          }
+        }
+      }
+      const skillAverages = Object.fromEntries(
+        Object.entries(skillTotals).map(([key, { sum, count }]) => [
+          key,
+          count > 0 ? Math.round(sum / count) : 0,
+        ]),
+      ) as Record<ComponentKey, number>;
+
+      // Top performers (top 3 by latest overall)
+      const topPerformers = [...latestPerStudent]
+        .sort((a, b) => b.latest.overall - a.latest.overall)
+        .slice(0, 3)
+        .map((s) => ({
+          userId: s.userId,
+          name: s.name,
+          overall: s.latest.overall,
+          band: s.latest.band,
+        }));
+
+      // Most improved (top 3 by delta between latest and previous)
+      const mostImproved = latestPerStudent
+        .filter((s) => s.previous)
+        .map((s) => ({
+          userId: s.userId,
+          name: s.name,
+          delta: s.latest.overall - s.previous!.overall,
+        }))
+        .sort((a, b) => b.delta - a.delta)
+        .slice(0, 3);
+
+      // Students needing attention — using shared logic
+      const mostRecentOrgDate = allScores[0]?.examDate ?? new Date();
+      const attention: {
+        userId: string;
+        name: string;
+        reason: "regressing" | "below_pass" | "inactive" | "incomplete";
+        detail: string;
+        overall: number;
+      }[] = [];
+
+      for (const s of latestPerStudent) {
+        const studentScores = byStudent.get(s.userId)?.scores ?? [];
+        const flag = determineAttention(
+          s.latest,
+          s.previous,
+          studentScores,
+          mostRecentOrgDate,
+        );
+        if (flag) {
+          attention.push({
+            userId: s.userId,
+            name: s.name,
+            reason: flag.reason,
+            detail: flag.detail,
+            overall: s.latest.overall,
+          });
+        }
+      }
+
+      attention.sort(
+        (a, b) => REASON_ORDER[a.reason] - REASON_ORDER[b.reason],
+      );
+
+      // Class progress over time — monthly averages
+      const monthlyMap = new Map<string, number[]>();
+      for (const score of allScores) {
+        if (ctx.userId && score.userId === ctx.userId) continue;
+        const key = `${score.examDate.getFullYear()}-${String(score.examDate.getMonth() + 1).padStart(2, "0")}`;
+        const arr = monthlyMap.get(key) ?? [];
+        arr.push(enrichScore(score).overall);
+        monthlyMap.set(key, arr);
+      }
+      const classProgress = [...monthlyMap.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, overalls]) => ({
+          month,
+          average: Math.round(
+            overalls.reduce((a, b) => a + b, 0) / overalls.length,
+          ),
+        }));
+
+      return {
+        totalStudents,
+        classAverage,
+        passRate,
+        passing,
+        bandDistribution,
+        skillAverages,
+        topPerformers,
+        mostImproved,
+        attention,
+        classProgress,
+      };
+    }),
 
   studentProgress: teacherProcedure
-    .input(z.object({ studentId: z.string() }))
+    .input(
+      z.object({
+        studentId: z.string(),
+        groupId: z.string().optional(),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       if (!ctx.orgId) {
         throw new TRPCError({
@@ -440,6 +526,7 @@ export const scoreRouter = createTRPCRouter({
         where: {
           userId: input.studentId,
           organizationId: ctx.orgId,
+          ...(input.groupId ? { groupId: input.groupId } : {}),
         },
         orderBy: { examDate: "asc" },
       });
@@ -450,6 +537,7 @@ export const scoreRouter = createTRPCRouter({
   studentList: teacherProcedure
     .input(
       z.object({
+        groupId: z.string().optional(),
         search: z.string().optional(),
         band: z
           .enum([
@@ -476,15 +564,29 @@ export const scoreRouter = createTRPCRouter({
         });
       }
 
-      // 1. Find student IDs in this org (exclude teacher)
-      const orgScores = await ctx.db.scoreLog.findMany({
-        where: { organizationId: ctx.orgId },
-        select: { userId: true },
-        distinct: ["userId"],
-      });
-      const studentIds = orgScores
-        .map((s) => s.userId)
-        .filter((id) => id !== ctx.userId);
+      // 1. Find student IDs — either from group membership or from score logs
+      let studentIds: string[];
+
+      if (input.groupId) {
+        // When filtering by group, get members of that group
+        const members = await ctx.db.groupMember.findMany({
+          where: { groupId: input.groupId, active: true },
+          select: { userId: true },
+        });
+        studentIds = members
+          .map((m) => m.userId)
+          .filter((id) => id !== ctx.userId);
+      } else {
+        // All students in the org (from score logs)
+        const orgScores = await ctx.db.scoreLog.findMany({
+          where: { organizationId: ctx.orgId },
+          select: { userId: true },
+          distinct: ["userId"],
+        });
+        studentIds = orgScores
+          .map((s) => s.userId)
+          .filter((id) => id !== ctx.userId);
+      }
 
       // 2. Query users — DB-level search
       const users = await ctx.db.user.findMany({
@@ -501,11 +603,11 @@ export const scoreRouter = createTRPCRouter({
         },
       });
 
-      // 3. Fetch all scores for matched students
+      // 3. Fetch scores for matched students (scoped to group if specified)
       const matchedIds = users.map((u) => u.clerkId);
       const allScores = await ctx.db.scoreLog.findMany({
         where: {
-          organizationId: ctx.orgId,
+          ...teacherScoreWhere(ctx.orgId, input.groupId),
           userId: { in: matchedIds },
         },
         orderBy: { examDate: "desc" },
@@ -601,5 +703,89 @@ export const scoreRouter = createTRPCRouter({
       const students = enrichedStudents.slice(skip, skip + input.pageSize);
 
       return { students, total, page, pageSize: input.pageSize, totalPages };
+    }),
+
+  classStats: protectedProcedure
+    .input(groupFilter)
+    .query(async ({ ctx, input }) => {
+      if (!ctx.orgId) {
+        return null;
+      }
+
+      // Get the latest score per student in this org/group (excluding current user)
+      const allScores = await ctx.db.scoreLog.findMany({
+        where: teacherScoreWhere(ctx.orgId, input.groupId),
+        orderBy: { examDate: "desc" },
+      });
+
+      const latestByStudent = new Map<
+        string,
+        ReturnType<typeof enrichScore>
+      >();
+      for (const score of allScores) {
+        if (!latestByStudent.has(score.userId)) {
+          latestByStudent.set(score.userId, enrichScore(score));
+        }
+      }
+
+      // Remove current user from class stats (they see their own data separately)
+      latestByStudent.delete(ctx.userId);
+
+      const totalStudents = latestByStudent.size;
+      if (totalStudents === 0) {
+        return {
+          totalStudents: 0,
+          classAverage: 0,
+          rank: null,
+          skillAverages: null,
+        };
+      }
+
+      // Class average
+      const overalls = [...latestByStudent.values()].map((s) => s.overall);
+      const classAverage = Math.round(
+        overalls.reduce((a, b) => a + b, 0) / overalls.length,
+      );
+
+      // Rank: where does the current student fall?
+      const myLatest = allScores.find((s) => s.userId === ctx.userId);
+      let rank: number | null = null;
+      if (myLatest) {
+        const myOverall = enrichScore(myLatest).overall;
+        const betterCount = overalls.filter((o) => o > myOverall).length;
+        rank = betterCount + 1;
+      }
+
+      // Skill averages
+      const skillTotals: Record<ComponentKey, { sum: number; count: number }> =
+        {
+          reading: { sum: 0, count: 0 },
+          useOfEnglish: { sum: 0, count: 0 },
+          writing: { sum: 0, count: 0 },
+          listening: { sum: 0, count: 0 },
+          speaking: { sum: 0, count: 0 },
+        };
+      for (const enriched of latestByStudent.values()) {
+        for (const [key, value] of Object.entries(enriched.scaleScores)) {
+          if (value != null) {
+            const k = key as ComponentKey;
+            skillTotals[k].sum += value;
+            skillTotals[k].count++;
+          }
+        }
+      }
+      const skillAverages = Object.fromEntries(
+        Object.entries(skillTotals).map(([key, { sum, count }]) => [
+          key,
+          count > 0 ? Math.round(sum / count) : 0,
+        ]),
+      ) as Record<ComponentKey, number>;
+
+      return {
+        totalStudents,
+        classAverage,
+        rank,
+        skillAverages,
+      };
     }),
 });

@@ -29,7 +29,8 @@ One row per exam attempt. A student can enter all 5 skills, some, or just one.
 | -------------- | -------- | --------------------------------------- |
 | id             | String   | PK (cuid)                               |
 | userId         | String   | FK → User.clerkId                       |
-| organizationId | String   | Clerk Organization ID (the group)       |
+| organizationId | String   | Clerk Organization ID (the tenant)      |
+| groupId        | String?  | FK → Group. NULL for legacy data.       |
 | examDate       | DateTime | When the exam was taken                 |
 | reading        | Int?     | Raw score 0–44. NULL = not entered.     |
 | useOfEnglish   | Int?     | Raw score 0–28. NULL = not entered.     |
@@ -44,11 +45,47 @@ One row per exam attempt. A student can enter all 5 skills, some, or just one.
 - `organizationId` ties the score to the group/course context.
 - `examDate` is the date the student says they took the exam (may differ from `createdAt`).
 
+### Group
+
+A class or course created by a teacher within their Clerk organization.
+
+| Column         | Type     | Notes                              |
+| -------------- | -------- | ---------------------------------- |
+| id             | String   | PK (cuid)                          |
+| name           | String   | e.g. "Proficiency Monday 2026"     |
+| organizationId | String   | Clerk org ID (the tenant boundary) |
+| createdAt      | DateTime | Auto-set                           |
+| updatedAt      | DateTime | Auto-updated                       |
+
+- One Clerk org can have many groups.
+- Teachers create/manage groups; students are assigned to them.
+
+### GroupMember
+
+Tracks student membership in groups with active/inactive history.
+
+| Column   | Type      | Notes                                        |
+| -------- | --------- | -------------------------------------------- |
+| id       | String    | PK (cuid)                                    |
+| groupId  | String    | FK → Group                                   |
+| userId   | String    | FK → User.clerkId                            |
+| active   | Boolean   | Only ONE active per user per org              |
+| joinedAt | DateTime  | When assigned to this group                  |
+| leftAt   | DateTime? | Set when deactivated (moved to another group)|
+
+- `@@unique([groupId, userId])` — no duplicate memberships.
+- **Invariant**: At most one active membership per user per org (enforced in app logic).
+- A student who moves groups gets their old membership deactivated and a new one created.
+
 ## Indexes
 
 - `ScoreLog(userId)` — fast lookups for a student's history.
-- `ScoreLog(organizationId)` — fast lookups for all scores in a group.
+- `ScoreLog(organizationId)` — fast lookups for all scores in an org.
+- `ScoreLog(groupId)` — fast lookups for all scores in a group.
 - `ScoreLog(userId, examDate)` — ordered progress queries.
+- `GroupMember(userId, active)` — fast lookup of a student's active group.
+- `GroupMember(groupId)` — fast listing of group members.
+- `Group(organizationId)` — list groups per org.
 
 ## Scoring Logic (computed, not stored)
 

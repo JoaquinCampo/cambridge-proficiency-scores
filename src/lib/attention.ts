@@ -85,12 +85,12 @@ export const REASON_CONFIG: Record<
 > = {
   regressing: {
     label: "Regressing",
-    bg: "rgba(220,38,38,0.08)",
+    bg: "rgba(185,28,28,0.08)",
     text: "var(--destructive)",
   },
   below_pass: {
     label: "Below Pass",
-    bg: "rgba(148,163,184,0.1)",
+    bg: "rgba(161,161,170,0.1)",
     text: "var(--band-below-c1)",
   },
   inactive: {

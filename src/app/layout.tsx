@@ -28,7 +28,19 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+        appearance={{
+          elements: {
+            organizationListCreateOrganizationActionButton: "hidden",
+          },
+        }}
+        localization={{
+          organizationList: {
+            titleWithoutPersonal: "Choose your group",
+            subtitle: "Select a group to continue",
+          },
+        }}
+      >
       <html lang="en" className={`${spaceGrotesk.variable} ${inter.variable}`}>
         <body>
           <TRPCReactProvider>{children}</TRPCReactProvider>

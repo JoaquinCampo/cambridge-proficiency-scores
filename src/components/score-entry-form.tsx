@@ -50,6 +50,7 @@ export function ScoreEntryForm({
   onSubmit,
   initialValues,
   isSubmitting,
+  error,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -64,6 +65,7 @@ export function ScoreEntryForm({
     notes: string | null;
   }>;
   isSubmitting?: boolean;
+  error?: string | null;
 }) {
   const [values, setValues] = useState<FormValues>(() => ({
     examDate: initialValues?.examDate
@@ -171,6 +173,11 @@ export function ScoreEntryForm({
               />
             </div>
           </div>
+
+          {/* Error */}
+          {error && (
+            <p className="px-6 text-sm text-red-500">{error}</p>
+          )}
 
           {/* Footer */}
           <div className="flex justify-end gap-3 px-6 py-6">

@@ -14,7 +14,12 @@ export default clerkMiddleware(async (auth, request) => {
     return;
   }
 
-  const { orgId } = await auth.protect();
+  // Enforce authentication (redirects to Clerk sign-in if not logged in).
+  // Do NOT pass organization requirement — we handle that ourselves below.
+  await auth.protect();
+
+  // Now read the session without enforcing org, so we can redirect gracefully
+  const { orgId } = await auth();
 
   // Authenticated but no organization — redirect to /no-group
   if (!orgId && !isNoGroupRoute(request)) {

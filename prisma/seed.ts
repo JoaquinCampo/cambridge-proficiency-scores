@@ -168,8 +168,10 @@ const NOTES = [
 async function main() {
   console.log("🌱 Seeding database...\n");
 
-  // Clear existing data
+  // Clear existing data (order matters for FK constraints)
   await db.scoreLog.deleteMany();
+  await db.groupMember.deleteMany();
+  await db.group.deleteMany();
   await db.user.deleteMany();
 
   // Create teacher (real Clerk user)
@@ -184,6 +186,26 @@ async function main() {
   });
   console.log(`  👩‍🏫 Teacher: ${teacher.name}`);
 
+  // Create groups
+  const proficiencyGroup = await db.group.create({
+    data: {
+      name: "Proficiency Monday 2026",
+      organizationId: ORG_ID,
+    },
+  });
+
+  const proficiencyGroup2 = await db.group.create({
+    data: {
+      name: "Proficiency Wednesday 2026",
+      organizationId: ORG_ID,
+    },
+  });
+
+  console.log(`  📁 Group: ${proficiencyGroup.name}`);
+  console.log(`  📁 Group: ${proficiencyGroup2.name}`);
+
+  const groups = [proficiencyGroup, proficiencyGroup2];
+
   // Create real student with hand-crafted progression (C1 → Grade C territory)
   const realStudent = await db.user.upsert({
     where: { clerkId: REAL_STUDENT_CLERK_ID },
@@ -193,6 +215,15 @@ async function main() {
       name: "Test Student",
     },
     update: {},
+  });
+
+  // Assign real student to the Monday group
+  await db.groupMember.create({
+    data: {
+      groupId: proficiencyGroup.id,
+      userId: realStudent.clerkId,
+      active: true,
+    },
   });
 
   // 10 exams over 6 months: deliberate upward arc
@@ -232,6 +263,7 @@ async function main() {
       data: {
         userId: realStudent.clerkId,
         organizationId: ORG_ID,
+        groupId: proficiencyGroup.id,
         ...s,
       },
     });
@@ -254,6 +286,16 @@ async function main() {
       },
     });
 
+    // Assign to a group (roughly 60/40 split between Monday and Wednesday)
+    const group = i < 15 ? proficiencyGroup : proficiencyGroup2;
+    await db.groupMember.create({
+      data: {
+        groupId: group.id,
+        userId: student.clerkId,
+        active: true,
+      },
+    });
+
     // Each student has a base skill level
     const level = pick<Level>(["weak", "average", "average", "strong"]);
     const numScores = rng(SCORES_PER_STUDENT.min, SCORES_PER_STUDENT.max);
@@ -272,6 +314,7 @@ async function main() {
         data: {
           userId: student.clerkId,
           organizationId: ORG_ID,
+          groupId: group.id,
           examDate,
           reading: maybe(generateRawScore("reading", level, progress)),
           useOfEnglish: maybe(
@@ -290,12 +333,12 @@ async function main() {
 
     totalScores += numScores;
     console.log(
-      `  👤 ${student.name} (${level}) — ${numScores} scores`,
+      `  👤 ${student.name} (${level}, ${group.name}) — ${numScores} scores`,
     );
   }
 
   console.log(
-    `\n✅ Seeded ${NUM_STUDENTS} students + 1 teacher, ${totalScores} score logs`,
+    `\n✅ Seeded ${NUM_STUDENTS} students + 1 teacher, ${totalScores} score logs, ${groups.length} groups`,
   );
 }
 

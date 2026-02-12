@@ -13,7 +13,9 @@ import {
 } from "lucide-react";
 import { api } from "~/trpc/react";
 import { PageHeader } from "~/components/page-header";
+import { GroupSelector } from "~/components/group-selector";
 import { BandBadge } from "~/components/band-badge";
+import { StudentListSkeleton } from "~/components/skeleton";
 import { REASON_CONFIG, type AttentionReason } from "~/lib/attention";
 import type { ComponentKey } from "~/lib/scoring";
 
@@ -82,6 +84,9 @@ export default function StudentsPage() {
   const router = useRouter();
 
   // Read initial state from URL
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(
+    searchParams.get("group") ?? null,
+  );
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [band, setBand] = useState<BandValue>(
     (searchParams.get("band") as BandValue) ?? "all",
@@ -149,6 +154,7 @@ export default function StudentsPage() {
   };
 
   const { data, isLoading } = api.score.studentList.useQuery({
+    groupId: selectedGroupId ?? undefined,
     search: debouncedSearch || undefined,
     band: band !== "all" ? (band as "Grade A" | "Grade B" | "Grade C" | "Level C1" | "No certificate") : undefined,
     attention: attentionFilter || undefined,
@@ -175,6 +181,16 @@ export default function StudentsPage() {
       />
 
       <div className="flex flex-col gap-4">
+        {/* Group filter */}
+        <GroupSelector
+          value={selectedGroupId}
+          onChange={(id) => {
+            setSelectedGroupId(id);
+            setPage(1);
+            updateUrl({ group: id ?? undefined, page: undefined });
+          }}
+        />
+
         {/* Filter bar */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
@@ -214,7 +230,7 @@ export default function StudentsPage() {
             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
             style={{
               backgroundColor: attentionFilter
-                ? "rgba(220,38,38,0.1)"
+                ? "rgba(185,28,28,0.1)"
                 : "var(--secondary)",
               color: attentionFilter
                 ? "var(--destructive)"
@@ -264,9 +280,7 @@ export default function StudentsPage() {
 
         {/* Student list */}
         {isLoading ? (
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] py-12 text-center">
-            <p className="text-sm text-[var(--muted-foreground)]">Loading...</p>
-          </div>
+          <StudentListSkeleton />
         ) : !data || data.students.length === 0 ? (
           <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] py-12 text-center">
             <p className="text-sm text-[var(--muted-foreground)]">
@@ -361,8 +375,8 @@ export default function StudentsPage() {
                             style={{
                               backgroundColor:
                                 s.delta >= 0
-                                  ? "rgba(22,163,74,0.1)"
-                                  : "rgba(220,38,38,0.1)",
+                                  ? "rgba(5,150,105,0.1)"
+                                  : "rgba(185,28,28,0.1)",
                               color:
                                 s.delta >= 0
                                   ? "var(--band-grade-a)"

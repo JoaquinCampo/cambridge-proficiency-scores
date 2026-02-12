@@ -8,6 +8,7 @@ import {
   Users,
   Building2,
   LayoutDashboard,
+  FolderOpen,
 } from "lucide-react";
 import { UserButton, useOrganization } from "@clerk/nextjs";
 import { cn } from "~/lib/utils";
@@ -20,6 +21,7 @@ const studentLinks = [
 
 const teacherLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/groups", label: "Groups", icon: FolderOpen },
   { href: "/students", label: "Students", icon: Users },
 ];
 
@@ -37,7 +39,7 @@ export function AppNav() {
       <div className="flex items-center gap-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-m)] bg-gradient-to-br from-[var(--primary)] to-[#4F46E5] shadow-sm transition-transform group-hover:scale-105" style={{ transitionDuration: "var(--transition-fast)" }}>
+          <div className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-m)] bg-gradient-to-br from-[var(--primary)] to-[#6D28D9] shadow-sm transition-transform group-hover:scale-105" style={{ transitionDuration: "var(--transition-fast)" }}>
             <span className="text-xs font-bold text-white">C2</span>
           </div>
           <span className="text-base font-semibold text-[var(--foreground)]">
@@ -78,7 +80,15 @@ export function AppNav() {
         {/* Org badge */}
         {organization && (
           <div className="flex items-center gap-1.5 rounded-full bg-[var(--secondary)] px-3 py-1.5">
-            <Building2 className="h-3.5 w-3.5 text-[var(--muted-foreground)]" />
+            {organization.imageUrl ? (
+              <img
+                src={organization.imageUrl}
+                alt={organization.name}
+                className="h-4 w-4 rounded-full object-cover"
+              />
+            ) : (
+              <Building2 className="h-3.5 w-3.5 text-[var(--muted-foreground)]" />
+            )}
             <span className="text-[13px] font-medium text-[var(--foreground)]">
               {organization.name}
             </span>

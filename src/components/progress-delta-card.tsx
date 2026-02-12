@@ -6,11 +6,11 @@ import { useCountUp } from "~/hooks/use-count-up";
 import type { ComponentKey } from "~/lib/scoring";
 
 const skillShort: Record<ComponentKey, { label: string; bg: string; text: string }> = {
-  reading: { label: "R", bg: "rgba(37,99,235,0.08)", text: "var(--skill-reading)" },
+  reading: { label: "R", bg: "rgba(67,56,202,0.08)", text: "var(--skill-reading)" },
   useOfEnglish: { label: "UoE", bg: "rgba(124,58,237,0.08)", text: "var(--skill-uoe)" },
-  writing: { label: "W", bg: "rgba(22,163,74,0.08)", text: "var(--skill-writing)" },
+  writing: { label: "W", bg: "rgba(5,150,105,0.08)", text: "var(--skill-writing)" },
   listening: { label: "L", bg: "rgba(217,119,6,0.08)", text: "var(--skill-listening)" },
-  speaking: { label: "S", bg: "rgba(220,38,38,0.08)", text: "var(--skill-speaking)" },
+  speaking: { label: "S", bg: "rgba(185,28,28,0.08)", text: "var(--skill-speaking)" },
 };
 
 type ScaleScores = Partial<Record<ComponentKey, number>>;
@@ -40,7 +40,7 @@ export function ProgressDeltaCard({
             Latest Overall
           </span>
           <div className="flex items-end gap-2">
-            <span className="text-3xl font-bold text-[var(--foreground)]">
+            <span className="font-display text-[32px] font-bold tracking-tight text-[var(--foreground)]">
               {animatedOverall}
             </span>
             {overallDelta != null && (

@@ -53,12 +53,12 @@ export function ScoreSnapshotCard({
           className="score-ring flex h-20 w-20 shrink-0 items-center justify-center rounded-full"
           style={{
             border: "4px solid transparent",
-            backgroundImage: "linear-gradient(var(--card), var(--card)), linear-gradient(135deg, var(--primary), #4F46E5)",
+            backgroundImage: "linear-gradient(var(--card), var(--card)), linear-gradient(135deg, var(--primary), #6D28D9)",
             backgroundOrigin: "border-box",
             backgroundClip: "padding-box, border-box",
           }}
         >
-          <span className="text-2xl font-bold text-[var(--foreground)]">
+          <span className="font-display text-[28px] font-bold tracking-tight text-[var(--foreground)]">
             {animatedOverall}
           </span>
         </div>

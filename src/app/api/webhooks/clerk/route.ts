@@ -1,6 +1,6 @@
 import { Webhook } from "svix";
 import { headers } from "next/headers";
-import type { WebhookEvent } from "@clerk/nextjs/server";
+import { clerkClient, type WebhookEvent } from "@clerk/nextjs/server";
 import { env } from "~/env";
 import { db } from "~/server/db";
 
@@ -52,6 +52,102 @@ export async function POST(req: Request) {
       if (id) {
         await db.user.delete({ where: { clerkId: id } }).catch(() => {
           // User may not exist in our DB yet
+        });
+      }
+      break;
+    }
+    case "organizationMembership.created": {
+      const { public_user_data, organization } = event.data;
+      const userId = public_user_data.user_id;
+      const orgId = organization.id;
+
+      // Ensure user record exists (user.created webhook may not have fired yet)
+      if (userId && public_user_data.identifier) {
+        await db.user.upsert({
+          where: { clerkId: userId },
+          create: {
+            clerkId: userId,
+            email: public_user_data.identifier,
+            name:
+              [public_user_data.first_name, public_user_data.last_name]
+                .filter(Boolean)
+                .join(" ") || null,
+          },
+          update: {},
+        });
+      }
+
+      // Look up the invitation that created this membership to get groupId.
+      // Invitation publicMetadata does NOT transfer to membership public_metadata,
+      // so we need to query the invitation directly.
+      let groupId: string | undefined;
+      if (public_user_data.identifier) {
+        try {
+          const clerk = await clerkClient();
+          const invitations =
+            await clerk.organizations.getOrganizationInvitationList({
+              organizationId: orgId,
+              limit: 100,
+            });
+          const matchingInvite = invitations.data.find(
+            (inv) =>
+              inv.emailAddress === public_user_data.identifier &&
+              (inv.status === "accepted" || inv.status === "pending"),
+          );
+          groupId = (
+            matchingInvite?.publicMetadata as { groupId?: string } | undefined
+          )?.groupId;
+        } catch {
+          // If invitation lookup fails, proceed without group assignment
+        }
+      }
+
+      // Auto-assign to group if invitation carried a groupId
+      if (userId && groupId) {
+        const group = await db.group.findUnique({
+          where: { id: groupId },
+        });
+
+        if (group?.organizationId === orgId) {
+          // Deactivate any existing active membership in this org
+          await db.groupMember.updateMany({
+            where: {
+              userId,
+              active: true,
+              group: { organizationId: orgId },
+            },
+            data: { active: false, leftAt: new Date() },
+          });
+
+          await db.groupMember.upsert({
+            where: { groupId_userId: { groupId, userId } },
+            create: { groupId, userId, active: true },
+            update: { active: true, joinedAt: new Date(), leftAt: null },
+          });
+        }
+      }
+      break;
+    }
+    case "organizationMembership.deleted": {
+      const { public_user_data, organization } = event.data;
+      const userId = public_user_data.user_id;
+      const orgId = organization.id;
+
+      // Deactivate all group memberships for this user in this org
+      const memberships = await db.groupMember.findMany({
+        where: {
+          userId,
+          active: true,
+          group: { organizationId: orgId },
+        },
+      });
+
+      if (memberships.length > 0) {
+        await db.groupMember.updateMany({
+          where: {
+            id: { in: memberships.map((m) => m.id) },
+          },
+          data: { active: false, leftAt: new Date() },
         });
       }
       break;

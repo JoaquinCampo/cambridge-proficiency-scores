@@ -10,13 +10,13 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between py-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">
+    <div className="animate-in flex items-center justify-between py-6">
+      <div className="flex flex-col gap-1.5">
+        <h1 className="font-display text-[26px] font-bold tracking-tight text-[var(--foreground)]">
           {title}
         </h1>
         {description && (
-          <p className="text-sm text-[var(--muted-foreground)]">
+          <p className="text-[13px] text-[var(--muted-foreground)]">
             {description}
           </p>
         )}

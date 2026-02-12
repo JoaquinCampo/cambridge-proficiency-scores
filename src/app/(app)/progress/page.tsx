@@ -5,6 +5,7 @@ import { PageHeader } from "~/components/page-header";
 import { OverallChart } from "~/components/overall-chart";
 import { SkillProgressChart } from "~/components/skill-progress-chart";
 import { ScaleReferenceBar } from "~/components/scale-reference-bar";
+import { CardSkeleton } from "~/components/skeleton";
 import type { ComponentKey } from "~/lib/scoring";
 
 export default function ProgressPage() {
@@ -17,7 +18,10 @@ export default function ProgressPage() {
           title="Progress"
           description="Track your Cambridge C2 Proficiency score trends"
         />
-        <p className="text-sm text-[var(--muted-foreground)]">Loading...</p>
+        <div className="flex flex-col gap-6">
+          <CardSkeleton height={300} />
+          <CardSkeleton height={300} />
+        </div>
       </>
     );
   }

@@ -19,7 +19,8 @@
 - **Sign-in method**: Google OAuth (students and teachers sign in with their Google accounts).
 - **Access control**: A user can access the app if they belong to at least one Clerk Organization.
 - **Roles**: Stored in Clerk user metadata — either `student` or `teacher`. Not stored in our database.
-- **Organizations**: Clerk Organizations model groups/courses. A teacher is assigned to one or more organizations and can see all students within them.
+- **Organizations**: Clerk Organizations = tenant boundary (one per teacher/school). NOT one per class — Clerk pricing makes per-class orgs prohibitive.
+- **Groups**: Modeled in the app database (`Group` + `GroupMember` tables) within a Clerk org. Teachers create groups for their classes; students are assigned to one active group at a time. Scores are stamped with `groupId`. See [`groups-design.md`](./groups-design.md).
 
 ## User Identity
 

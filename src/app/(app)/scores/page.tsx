@@ -24,7 +24,9 @@ type ScoreEntry = {
 
 export default function ScoresPage() {
   const utils = api.useUtils();
+  const { data: me } = api.user.me.useQuery();
   const { data: scores, isLoading } = api.score.list.useQuery();
+  const hasGroup = !!me?.activeGroup;
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingScore, setEditingScore] = useState<ScoreEntry | null>(null);
@@ -57,13 +59,15 @@ export default function ScoresPage() {
         title="Score History"
         description="View and manage all your exam score entries"
         action={
-          <button
-            onClick={() => setFormOpen(true)}
-            className="flex items-center gap-1.5 rounded-full bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white"
-          >
-            <Plus className="h-4 w-4" />
-            New Score
-          </button>
+          hasGroup ? (
+            <button
+              onClick={() => setFormOpen(true)}
+              className="flex items-center gap-1.5 rounded-full bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white"
+            >
+              <Plus className="h-4 w-4" />
+              New Score
+            </button>
+          ) : undefined
         }
       />
 
@@ -92,6 +96,7 @@ export default function ScoresPage() {
         onOpenChange={setFormOpen}
         isSubmitting={createMutation.isPending}
         onSubmit={(values) => createMutation.mutate(values)}
+        error={createMutation.error?.message}
       />
 
       {/* Edit form */}
@@ -105,6 +110,7 @@ export default function ScoresPage() {
           onSubmit={(values) =>
             updateMutation.mutate({ id: editingScore.id, ...values })
           }
+          error={updateMutation.error?.message}
         />
       )}
 

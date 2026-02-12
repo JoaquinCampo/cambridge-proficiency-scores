@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   Users,
@@ -26,6 +27,8 @@ import {
 } from "recharts";
 import { api } from "~/trpc/react";
 import { PageHeader } from "~/components/page-header";
+import { GroupSelector } from "~/components/group-selector";
+import { StatCardsSkeleton, CardSkeleton } from "~/components/skeleton";
 
 const SKILL_COLORS: Record<string, string> = {
   reading: "var(--skill-reading)",
@@ -44,11 +47,11 @@ const SKILL_LABELS: Record<string, string> = {
 };
 
 const BAND_COLORS: Record<string, { bg: string; text: string }> = {
-  A: { bg: "rgba(22,163,74,0.1)", text: "var(--band-grade-a)" },
-  B: { bg: "rgba(37,99,235,0.1)", text: "var(--band-grade-b)" },
+  A: { bg: "rgba(5,150,105,0.1)", text: "var(--band-grade-a)" },
+  B: { bg: "rgba(67,56,202,0.1)", text: "var(--band-grade-b)" },
   C: { bg: "rgba(124,58,237,0.1)", text: "var(--band-grade-c)" },
   C1: { bg: "rgba(217,119,6,0.1)", text: "var(--band-c1)" },
-  below: { bg: "rgba(148,163,184,0.1)", text: "var(--band-below-c1)" },
+  below: { bg: "rgba(161,161,170,0.1)", text: "var(--band-below-c1)" },
 };
 
 const BAND_LABELS: Record<string, string> = {
@@ -65,13 +68,13 @@ const REASON_CONFIG: Record<
 > = {
   regressing: {
     label: "Regressing",
-    bg: "rgba(220,38,38,0.08)",
+    bg: "rgba(185,28,28,0.08)",
     text: "var(--destructive)",
     Icon: TrendingDown,
   },
   below_pass: {
     label: "Below Pass",
-    bg: "rgba(148,163,184,0.1)",
+    bg: "rgba(161,161,170,0.1)",
     text: "var(--band-below-c1)",
     Icon: CircleAlert,
   },
@@ -99,7 +102,10 @@ function getInitials(name: string) {
 }
 
 export default function DashboardPage() {
-  const { data, isLoading } = api.score.dashboard.useQuery();
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const { data, isLoading } = api.score.dashboard.useQuery({
+    groupId: selectedGroupId ?? undefined,
+  });
 
   if (isLoading || !data) {
     return (
@@ -108,7 +114,19 @@ export default function DashboardPage() {
           title="Dashboard"
           description="Loading class overview..."
         />
-        <p className="text-sm text-[var(--muted-foreground)]">Loading...</p>
+        <div className="flex flex-col gap-6">
+          <StatCardsSkeleton />
+          <div className="flex gap-6">
+            <div className="flex min-w-0 flex-1 flex-col gap-6">
+              <CardSkeleton height={180} />
+              <CardSkeleton height={320} />
+            </div>
+            <div className="flex w-[340px] shrink-0 flex-col gap-6">
+              <CardSkeleton height={200} />
+              <CardSkeleton height={160} />
+            </div>
+          </div>
+        </div>
       </>
     );
   }
@@ -125,6 +143,11 @@ export default function DashboardPage() {
         description={`${data.totalStudents} students — class overview`}
       />
 
+      {/* Group Filter */}
+      <div className="mb-5">
+        <GroupSelector value={selectedGroupId} onChange={setSelectedGroupId} />
+      </div>
+
       {/* Stats Row */}
       <div className="stagger-children grid grid-cols-3 gap-4">
         <StatCard
@@ -132,18 +155,24 @@ export default function DashboardPage() {
           value={String(data.totalStudents)}
           subtext="in this group"
           icon={<Users className="h-5 w-5" />}
+          iconBg="rgba(67,56,202,0.08)"
+          iconColor="var(--primary)"
         />
         <StatCard
           label="Class Average"
           value={String(data.classAverage)}
           subtext="Cambridge Scale"
           icon={<ChartNoAxesColumn className="h-5 w-5" />}
+          iconBg="rgba(124,58,237,0.08)"
+          iconColor="var(--band-grade-c)"
         />
         <StatCard
           label="C2 Pass Rate"
           value={`${data.passRate}%`}
           subtext={`${data.passing} of ${data.totalStudents} scoring 200+`}
           icon={<GraduationCap className="h-5 w-5" />}
+          iconBg="rgba(5,150,105,0.08)"
+          iconColor="var(--band-grade-a)"
         />
       </div>
 
@@ -160,7 +189,7 @@ export default function DashboardPage() {
             <div className="px-6 pb-6">
               {/* Stacked bar */}
               {bandTotal > 0 && (
-                <div className="flex h-8 overflow-hidden rounded-[var(--radius-m)]">
+                <div className="flex h-8 gap-1">
                   {(
                     Object.entries(data.bandDistribution) as [string, number][]
                   ).map(([key, count]) => {
@@ -170,6 +199,7 @@ export default function DashboardPage() {
                     return (
                       <div
                         key={key}
+                        className="rounded-[var(--radius-sm)]"
                         style={{
                           width: `${pct}%`,
                           backgroundColor: color?.text,
@@ -231,6 +261,8 @@ export default function DashboardPage() {
                     <CartesianGrid
                       strokeDasharray="3 3"
                       stroke="var(--border)"
+                      strokeOpacity={0.6}
+                      vertical={false}
                     />
                     <XAxis
                       dataKey="month"
@@ -318,17 +350,15 @@ export default function DashboardPage() {
                       <div
                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
                         style={{
-                          backgroundColor:
-                            s.reason === "regressing"
-                              ? "var(--destructive)"
-                              : s.reason === "below_pass"
-                                ? "var(--band-below-c1)"
-                                : s.reason === "inactive"
-                                  ? "var(--band-c1)"
-                                  : "var(--band-grade-c)",
+                          backgroundColor: (REASON_CONFIG[s.reason] ?? REASON_CONFIG.incomplete!).bg,
                         }}
                       >
-                        <span className="text-xs font-semibold text-white">
+                        <span
+                          className="text-xs font-semibold"
+                          style={{
+                            color: (REASON_CONFIG[s.reason] ?? REASON_CONFIG.incomplete!).text,
+                          }}
+                        >
                           {getInitials(s.name)}
                         </span>
                       </div>
@@ -355,15 +385,17 @@ export default function DashboardPage() {
                   );
                 })}
                 {data.attention.length > 4 && (
-                  <Link
-                    href="/students?filter=attention"
-                    className="flex items-center justify-center gap-1.5 border-t border-[var(--border)] px-6 py-3.5 transition-colors hover:bg-[var(--secondary)]/50"
-                  >
-                    <span className="text-[13px] font-medium text-[var(--primary)]">
-                      View all {data.attention.length} flagged students
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-[var(--primary)]" />
-                  </Link>
+                  <div className="border-t border-[var(--border)] px-6 py-4">
+                    <Link
+                      href="/students?filter=attention"
+                      className="flex items-center justify-center gap-1.5 rounded-[var(--radius-m)] bg-[var(--secondary)] px-4 py-2.5 transition-colors hover:bg-[var(--border)]"
+                    >
+                      <span className="text-[13px] font-medium text-[var(--foreground)]">
+                        View all {data.attention.length} flagged students
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5 text-[var(--muted-foreground)]" />
+                    </Link>
+                  </div>
                 )}
               </>
             )}
@@ -415,26 +447,30 @@ export default function DashboardPage() {
                 className="h-4 w-4"
                 style={{ color: "var(--band-grade-a)" }}
               />
-              <span className="text-sm font-semibold text-[var(--foreground)]">
+              <span className="font-display text-sm font-semibold text-[var(--foreground)]">
                 Top Performers
               </span>
             </div>
-            <div className="flex flex-col gap-2 px-5 pb-4">
+            <div className="flex flex-col px-5 pb-4">
               {data.topPerformers.map((s, i) => (
                 <div
                   key={s.userId}
-                  className="flex items-center justify-between"
+                  className="flex items-center gap-3 rounded-[var(--radius-m)] px-2 py-2.5 transition-colors hover:bg-[var(--secondary)]/60"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xs font-semibold text-[var(--muted-foreground)]">
-                      {i + 1}
-                    </span>
-                    <span className="text-[13px] font-medium text-[var(--foreground)]">
-                      {s.name}
-                    </span>
-                  </div>
                   <span
-                    className="text-[13px] font-bold"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                    style={{
+                      backgroundColor: i === 0 ? "rgba(5,150,105,0.1)" : "var(--secondary)",
+                      color: i === 0 ? "var(--band-grade-a)" : "var(--muted-foreground)",
+                    }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="flex-1 truncate text-[13px] font-medium text-[var(--foreground)]">
+                    {s.name}
+                  </span>
+                  <span
+                    className="font-display text-[14px] font-bold tabular-nums"
                     style={{
                       color:
                         s.band.label === "Grade A"
@@ -456,23 +492,23 @@ export default function DashboardPage() {
                 className="h-4 w-4"
                 style={{ color: "var(--band-grade-a)" }}
               />
-              <span className="text-sm font-semibold text-[var(--foreground)]">
+              <span className="font-display text-sm font-semibold text-[var(--foreground)]">
                 Most Improved
               </span>
             </div>
-            <div className="flex flex-col gap-2 px-5 pb-4">
+            <div className="flex flex-col px-5 pb-4">
               {data.mostImproved.map((s) => (
                 <div
                   key={s.userId}
-                  className="flex items-center justify-between"
+                  className="flex items-center gap-3 rounded-[var(--radius-m)] px-2 py-2.5 transition-colors hover:bg-[var(--secondary)]/60"
                 >
-                  <span className="text-[13px] font-medium text-[var(--foreground)]">
+                  <span className="flex-1 truncate text-[13px] font-medium text-[var(--foreground)]">
                     {s.name}
                   </span>
                   <span
-                    className="flex items-center gap-1 rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold"
+                    className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
                     style={{
-                      backgroundColor: "rgba(22,163,74,0.1)",
+                      backgroundColor: "rgba(5,150,105,0.1)",
                       color: "var(--band-grade-a)",
                     }}
                   >
@@ -495,11 +531,15 @@ function StatCard({
   value,
   subtext,
   icon,
+  iconBg,
+  iconColor,
 }: {
   label: string;
   value: string;
   subtext: string;
   icon: React.ReactNode;
+  iconBg?: string;
+  iconColor?: string;
 }) {
   return (
     <div className="card-base flex flex-col gap-3 p-6">
@@ -507,12 +547,20 @@ function StatCard({
         <span className="text-sm font-medium text-[var(--muted-foreground)]">
           {label}
         </span>
-        <span className="text-[var(--muted-foreground)]">{icon}</span>
+        <div
+          className="icon-well"
+          style={{
+            backgroundColor: iconBg ?? "var(--secondary)",
+            color: iconColor ?? "var(--muted-foreground)",
+          }}
+        >
+          {icon}
+        </div>
       </div>
-      <span className="text-[32px] font-bold leading-none text-[var(--foreground)]">
+      <span className="font-display text-[36px] font-bold leading-none tracking-tight text-[var(--foreground)]">
         {value}
       </span>
-      <span className="text-xs text-[var(--muted-foreground)]">{subtext}</span>
+      <span className="text-[11px] text-[var(--muted-foreground)]">{subtext}</span>
     </div>
   );
 }
@@ -534,7 +582,7 @@ function CardHeader({
 }) {
   return (
     <div className="px-6 py-5">
-      <h3 className="text-base font-semibold text-[var(--foreground)]">
+      <h3 className="font-display text-[15px] font-semibold text-[var(--foreground)]">
         {title}
       </h3>
       <p className="text-[13px] text-[var(--muted-foreground)]">{subtitle}</p>
