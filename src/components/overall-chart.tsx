@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceLine,
 } from "recharts";
 
 type ChartEntry = {
@@ -59,6 +60,18 @@ export function OverallChart({ data }: { data: ChartEntry[] }) {
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-m)",
                 fontSize: 13,
+              }}
+            />
+            <ReferenceLine
+              y={200}
+              stroke="var(--band-grade-c)"
+              strokeDasharray="3 3"
+              strokeWidth={1}
+              label={{
+                value: "C2 Pass",
+                position: "right",
+                fontSize: 10,
+                fill: "var(--band-grade-c)",
               }}
             />
             <Area
