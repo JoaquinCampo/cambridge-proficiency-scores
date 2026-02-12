@@ -4,7 +4,9 @@ const db = new PrismaClient();
 
 // --- Config --------------------------------------------------------------- //
 
-const ORG_ID = "org_fake_academy";
+const ORG_ID = "org_39ZehHaR64NClXqsMnn9MEjjeJy";
+const TEACHER_CLERK_ID = "user_39ZegHLtfQXfJcprQTQylQExlt8";
+const REAL_STUDENT_CLERK_ID = "user_39a1nmYqwoTxjw3Qto3HUUOPnhM";
 const NUM_STUDENTS = 25;
 const SCORES_PER_STUDENT = { min: 4, max: 12 };
 
@@ -170,15 +172,71 @@ async function main() {
   await db.scoreLog.deleteMany();
   await db.user.deleteMany();
 
-  // Create teacher
-  const teacher = await db.user.create({
-    data: {
-      clerkId: "user_fake_teacher_001",
-      email: "teacher@academy.test",
-      name: "Prof. Carmen Vidal",
+  // Create teacher (real Clerk user)
+  const teacher = await db.user.upsert({
+    where: { clerkId: TEACHER_CLERK_ID },
+    create: {
+      clerkId: TEACHER_CLERK_ID,
+      email: "joacocampo27@gmail.com",
+      name: "Joaquín Camponario",
     },
+    update: {},
   });
   console.log(`  👩‍🏫 Teacher: ${teacher.name}`);
+
+  // Create real student with hand-crafted progression (C1 → Grade C territory)
+  const realStudent = await db.user.upsert({
+    where: { clerkId: REAL_STUDENT_CLERK_ID },
+    create: {
+      clerkId: REAL_STUDENT_CLERK_ID,
+      email: "student@test.com",
+      name: "Test Student",
+    },
+    update: {},
+  });
+
+  // 10 exams over 6 months: deliberate upward arc
+  const realStudentScores: {
+    examDate: Date;
+    reading: number | null;
+    useOfEnglish: number | null;
+    writing: number | null;
+    listening: number | null;
+    speaking: number | null;
+    notes: string | null;
+  }[] = [
+    // Exam 1 — baseline, weak start (~185 overall)
+    { examDate: new Date("2025-08-12"), reading: 20, useOfEnglish: 12, writing: 14, listening: 13, speaking: 28, notes: "First mock exam — very nervous" },
+    // Exam 2 — slight dip, missing speaking (~182)
+    { examDate: new Date("2025-09-02"), reading: 22, useOfEnglish: 11, writing: 15, listening: 14, speaking: null, notes: "Couldn't do speaking section" },
+    // Exam 3 — small improvement (~189)
+    { examDate: new Date("2025-09-23"), reading: 24, useOfEnglish: 14, writing: 16, listening: 15, speaking: 32, notes: "Practice test #2" },
+    // Exam 4 — plateau (~191)
+    { examDate: new Date("2025-10-14"), reading: 25, useOfEnglish: 14, writing: 18, listening: 16, speaking: 34, notes: "Timed conditions" },
+    // Exam 5 — breakthrough in reading (~197)
+    { examDate: new Date("2025-11-04"), reading: 29, useOfEnglish: 16, writing: 19, listening: 17, speaking: 36, notes: "Reading felt much easier today!" },
+    // Exam 6 — first time crossing 200! (~202)
+    { examDate: new Date("2025-11-25"), reading: 30, useOfEnglish: 17, writing: 21, listening: 18, speaking: 40, notes: "Mock exam — finally passed C2!" },
+    // Exam 7 — small regression (~198), keeps it realistic
+    { examDate: new Date("2025-12-09"), reading: 28, useOfEnglish: 16, writing: 20, listening: 17, speaking: 38, notes: "Tough writing topic" },
+    // Exam 8 — bounce back (~205)
+    { examDate: new Date("2025-12-23"), reading: 31, useOfEnglish: 18, writing: 23, listening: 19, speaking: 42, notes: "Retake after holidays" },
+    // Exam 9 — strong (~210)
+    { examDate: new Date("2026-01-20"), reading: 33, useOfEnglish: 19, writing: 25, listening: 20, speaking: 48, notes: "Best practice test yet" },
+    // Exam 10 — latest, solid Grade C (~213)
+    { examDate: new Date("2026-02-03"), reading: 34, useOfEnglish: 20, writing: 26, listening: 21, speaking: 50, notes: "Felt confident on all sections" },
+  ];
+
+  for (const s of realStudentScores) {
+    await db.scoreLog.create({
+      data: {
+        userId: realStudent.clerkId,
+        organizationId: ORG_ID,
+        ...s,
+      },
+    });
+  }
+  console.log(`  🎓 Real student: ${realStudent.name} — ${realStudentScores.length} scores`);
 
   // Create students with scores
   let totalScores = 0;
