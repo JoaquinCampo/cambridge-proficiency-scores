@@ -1,5 +1,8 @@
+"use client";
+
 import { BandBadge } from "./band-badge";
 import { Pencil, Trash2, MessageSquareText, List } from "lucide-react";
+import { useCountUp } from "~/hooks/use-count-up";
 import type { ComponentKey } from "~/lib/scoring";
 
 const skillConfig: Record<ComponentKey, { label: string; color: string }> = {
@@ -33,6 +36,8 @@ export function ScoreSnapshotCard({
   onDelete?: () => void;
   onViewAll?: () => void;
 }) {
+  const animatedOverall = useCountUp(overall, 800);
+
   const dateStr = new Date(examDate).toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
@@ -40,16 +45,21 @@ export function ScoreSnapshotCard({
   });
 
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+    <div className="card-base">
       {/* Hero section */}
       <div className="flex items-center gap-5 px-7 py-6">
         {/* Score ring */}
         <div
-          className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full"
-          style={{ border: "4px solid var(--primary)" }}
+          className="score-ring flex h-20 w-20 shrink-0 items-center justify-center rounded-full"
+          style={{
+            border: "4px solid transparent",
+            backgroundImage: "linear-gradient(var(--card), var(--card)), linear-gradient(135deg, var(--primary), #4F46E5)",
+            backgroundOrigin: "border-box",
+            backgroundClip: "padding-box, border-box",
+          }}
         >
           <span className="text-2xl font-bold text-[var(--foreground)]">
-            {overall}
+            {animatedOverall}
           </span>
         </div>
         {/* Info */}
@@ -67,7 +77,7 @@ export function ScoreSnapshotCard({
       </div>
 
       {/* Skill bars */}
-      <div className="flex flex-col gap-2.5 px-7 pb-5">
+      <div className="stagger-children flex flex-col gap-2.5 px-7 pb-5">
         {(Object.keys(skillConfig) as ComponentKey[]).map((key) => {
           const config = skillConfig[key];
           const score = scaleScores[key];
@@ -81,7 +91,7 @@ export function ScoreSnapshotCard({
               </span>
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--secondary)]">
                 <div
-                  className="h-full rounded-full"
+                  className="animate-bar h-full rounded-full"
                   style={{ width: `${pct}%`, backgroundColor: config.color }}
                 />
               </div>
@@ -110,18 +120,27 @@ export function ScoreSnapshotCard({
             <button
               onClick={onViewAll}
               className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--secondary)] hover:text-[var(--foreground)]"
+              style={{ transition: "all var(--transition-fast)" }}
             >
               <List className="h-3.5 w-3.5" />
               All entries
             </button>
           )}
           {onEdit && (
-            <button onClick={onEdit} className="rounded p-1 hover:bg-[var(--secondary)]">
+            <button
+              onClick={onEdit}
+              className="rounded p-1 hover:bg-[var(--secondary)]"
+              style={{ transition: "background var(--transition-fast)" }}
+            >
               <Pencil className="h-4 w-4 text-[var(--muted-foreground)]" />
             </button>
           )}
           {onDelete && (
-            <button onClick={onDelete} className="rounded p-1 hover:bg-[var(--secondary)]">
+            <button
+              onClick={onDelete}
+              className="rounded p-1 hover:bg-[var(--secondary)]"
+              style={{ transition: "background var(--transition-fast)" }}
+            >
               <Trash2 className="h-4 w-4 text-[var(--muted-foreground)]" />
             </button>
           )}

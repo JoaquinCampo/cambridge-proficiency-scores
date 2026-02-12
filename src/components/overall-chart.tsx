@@ -16,9 +16,28 @@ type ChartEntry = {
   overall: number;
 };
 
+function CustomDot(props: Record<string, unknown>) {
+  const { cx, cy } = props as { cx: number; cy: number };
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={5} fill="var(--card)" stroke="var(--primary)" strokeWidth={2.5} />
+    </g>
+  );
+}
+
+function CustomActiveDot(props: Record<string, unknown>) {
+  const { cx, cy } = props as { cx: number; cy: number };
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={8} fill="var(--primary)" fillOpacity={0.15} />
+      <circle cx={cx} cy={cy} r={5} fill="var(--card)" stroke="var(--primary)" strokeWidth={2.5} />
+    </g>
+  );
+}
+
 export function OverallChart({ data }: { data: ChartEntry[] }) {
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+    <div className="card-static">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-5">
         <div className="flex flex-col gap-0.5">
@@ -37,11 +56,12 @@ export function OverallChart({ data }: { data: ChartEntry[] }) {
           <AreaChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
             <defs>
               <linearGradient id="overallGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.15} />
+                <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.12} />
+                <stop offset="60%" stopColor="var(--primary)" stopOpacity={0.04} />
                 <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.6} />
             <XAxis
               dataKey="date"
               tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
@@ -60,13 +80,16 @@ export function OverallChart({ data }: { data: ChartEntry[] }) {
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-m)",
                 fontSize: 13,
+                boxShadow: "var(--shadow-card-hover)",
               }}
+              cursor={{ stroke: "var(--primary)", strokeOpacity: 0.15, strokeWidth: 1 }}
             />
             <ReferenceLine
               y={200}
               stroke="var(--band-grade-c)"
-              strokeDasharray="3 3"
+              strokeDasharray="6 4"
               strokeWidth={1}
+              strokeOpacity={0.5}
               label={{
                 value: "C2 Pass",
                 position: "right",
@@ -78,10 +101,12 @@ export function OverallChart({ data }: { data: ChartEntry[] }) {
               type="monotone"
               dataKey="overall"
               stroke="var(--primary)"
-              strokeWidth={2}
+              strokeWidth={2.5}
               fill="url(#overallGradient)"
-              dot={{ r: 3, fill: "var(--primary)", strokeWidth: 0 }}
-              activeDot={{ r: 5 }}
+              dot={<CustomDot />}
+              activeDot={<CustomActiveDot />}
+              animationDuration={1000}
+              animationEasing="ease-out"
             />
           </AreaChart>
         </ResponsiveContainer>

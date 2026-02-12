@@ -26,7 +26,7 @@ export function SkillSpotlightCard({
   const weakest = sorted[sorted.length - 1]!;
 
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+    <div className="card-base">
       {/* Strongest */}
       <div className="flex items-center gap-3.5 px-6 py-5">
         <div

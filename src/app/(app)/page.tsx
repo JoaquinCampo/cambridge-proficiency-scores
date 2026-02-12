@@ -158,7 +158,8 @@ export default function HomePage() {
         action={
           <button
             onClick={() => setCreateOpen(true)}
-            className="flex items-center gap-1.5 rounded-full bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white"
+            className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[var(--primary)] to-[#4F46E5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:shadow-md"
+            style={{ transition: "all var(--transition-fast)" }}
           >
             <Plus className="h-4 w-4" />
             New Score
@@ -167,7 +168,7 @@ export default function HomePage() {
       />
 
       {/* Cards row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="stagger-children grid grid-cols-3 gap-4">
         <ScoreSnapshotCard
           overall={latest.overall}
           band={latest.band}
@@ -190,7 +191,7 @@ export default function HomePage() {
 
       {/* Skill recommendation */}
       {weakest && weakest[1] < 200 && (
-        <div className="mt-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-6 py-5 shadow-sm">
+        <div className="animate-in-delay-3 mt-4 card-static px-6 py-5">
           <div className="flex items-center gap-2 mb-2">
             <Lightbulb className="h-4 w-4 text-[var(--skill-listening)]" />
             <span className="text-sm font-semibold text-[var(--foreground)]">
@@ -204,7 +205,7 @@ export default function HomePage() {
       )}
 
       {/* Chart */}
-      <div className="mt-6">
+      <div className="animate-in-delay-3 mt-6">
         <OverallChart data={chartData} />
       </div>
 

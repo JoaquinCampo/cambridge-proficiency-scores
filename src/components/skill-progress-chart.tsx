@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceLine,
 } from "recharts";
 import type { ComponentKey } from "~/lib/scoring";
 
@@ -26,7 +27,7 @@ type ChartEntry = {
 
 export function SkillProgressChart({ data }: { data: ChartEntry[] }) {
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+    <div className="card-static">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-5">
         <div className="flex flex-col gap-0.5">
@@ -43,7 +44,7 @@ export function SkillProgressChart({ data }: { data: ChartEntry[] }) {
       <div className="px-6 pb-6">
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.6} />
             <XAxis
               dataKey="date"
               tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
@@ -62,7 +63,16 @@ export function SkillProgressChart({ data }: { data: ChartEntry[] }) {
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-m)",
                 fontSize: 13,
+                boxShadow: "var(--shadow-card-hover)",
               }}
+              cursor={{ stroke: "var(--muted-foreground)", strokeOpacity: 0.1, strokeWidth: 1 }}
+            />
+            <ReferenceLine
+              y={200}
+              stroke="var(--band-grade-c)"
+              strokeDasharray="6 4"
+              strokeWidth={1}
+              strokeOpacity={0.4}
             />
             <Legend
               verticalAlign="bottom"
@@ -70,7 +80,7 @@ export function SkillProgressChart({ data }: { data: ChartEntry[] }) {
               iconSize={8}
               wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
             />
-            {(Object.keys(skillConfig) as ComponentKey[]).map((key) => (
+            {(Object.keys(skillConfig) as ComponentKey[]).map((key, i) => (
               <Line
                 key={key}
                 type="monotone"
@@ -78,9 +88,12 @@ export function SkillProgressChart({ data }: { data: ChartEntry[] }) {
                 name={skillConfig[key].label}
                 stroke={skillConfig[key].color}
                 strokeWidth={2}
-                dot={{ r: 2.5, strokeWidth: 0, fill: skillConfig[key].color }}
-                activeDot={{ r: 4 }}
+                dot={{ r: 3, strokeWidth: 2, fill: "var(--card)", stroke: skillConfig[key].color }}
+                activeDot={{ r: 5, strokeWidth: 2, fill: "var(--card)", stroke: skillConfig[key].color }}
                 connectNulls
+                animationDuration={800}
+                animationBegin={i * 100}
+                animationEasing="ease-out"
               />
             ))}
           </LineChart>

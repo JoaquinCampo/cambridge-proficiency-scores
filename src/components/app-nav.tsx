@@ -32,12 +32,12 @@ export function AppNav() {
   const links = isTeacher ? teacherLinks : studentLinks;
 
   return (
-    <nav className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-6 py-3">
+    <nav className="nav-glass sticky top-0 z-50 flex items-center justify-between border-b border-[var(--border)] px-6 py-3 shadow-[var(--shadow-nav)]">
       {/* Left side */}
       <div className="flex items-center gap-8">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-m)] bg-[var(--primary)]">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-m)] bg-gradient-to-br from-[var(--primary)] to-[#4F46E5] shadow-sm transition-transform group-hover:scale-105" style={{ transitionDuration: "var(--transition-fast)" }}>
             <span className="text-xs font-bold text-white">C2</span>
           </div>
           <span className="text-base font-semibold text-[var(--foreground)]">
@@ -58,11 +58,12 @@ export function AppNav() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
+                  "flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition-all",
                   isActive
-                    ? "bg-[var(--secondary)] text-[var(--foreground)]"
-                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]",
+                    ? "bg-[var(--secondary)] text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted-foreground)] hover:bg-[var(--secondary)]/60 hover:text-[var(--foreground)]",
                 )}
+                style={{ transitionDuration: "var(--transition-fast)" }}
               >
                 <Icon className="h-4 w-4" />
                 {link.label}

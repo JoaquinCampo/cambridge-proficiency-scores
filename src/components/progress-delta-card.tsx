@@ -1,5 +1,8 @@
+"use client";
+
 import { BandBadge } from "./band-badge";
 import { TrendingUp } from "lucide-react";
+import { useCountUp } from "~/hooks/use-count-up";
 import type { ComponentKey } from "~/lib/scoring";
 
 const skillShort: Record<ComponentKey, { label: string; bg: string; text: string }> = {
@@ -25,10 +28,11 @@ export function ProgressDeltaCard({
   scaleScores: ScaleScores;
   previousScaleScores?: ScaleScores;
 }) {
+  const animatedOverall = useCountUp(overall, 800);
   const overallDelta = previousOverall != null ? overall - previousOverall : null;
 
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
+    <div className="card-base p-6">
       {/* Header */}
       <div className="flex items-end justify-between">
         <div className="flex flex-col gap-1">
@@ -37,7 +41,7 @@ export function ProgressDeltaCard({
           </span>
           <div className="flex items-end gap-2">
             <span className="text-3xl font-bold text-[var(--foreground)]">
-              {overall}
+              {animatedOverall}
             </span>
             {overallDelta != null && (
               <span

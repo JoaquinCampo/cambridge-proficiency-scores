@@ -126,7 +126,7 @@ export default function DashboardPage() {
       />
 
       {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="stagger-children grid grid-cols-3 gap-4">
         <StatCard
           label="Total Students"
           value={String(data.totalStudents)}
@@ -392,7 +392,7 @@ export default function DashboardPage() {
                     </span>
                     <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--secondary)]">
                       <div
-                        className="absolute inset-y-0 left-0 rounded-full"
+                        className="animate-bar absolute inset-y-0 left-0 rounded-full"
                         style={{
                           width: `${pct}%`,
                           backgroundColor: SKILL_COLORS[key],
@@ -502,7 +502,7 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
+    <div className="card-base flex flex-col gap-3 p-6">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-[var(--muted-foreground)]">
           {label}
@@ -519,7 +519,7 @@ function StatCard({
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+    <div className="card-static overflow-hidden">
       {children}
     </div>
   );

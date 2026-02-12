@@ -80,7 +80,7 @@ export function ScoreHistoryTable({
   onDelete: (score: EnrichedScore) => void;
 }) {
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+    <div className="card-static">
       {/* Header */}
       <div className="flex items-center border-b-2 border-[var(--border)] px-0 py-2.5">
         <span className="w-[120px] shrink-0 pl-4 text-xs font-semibold text-[var(--muted-foreground)]">
