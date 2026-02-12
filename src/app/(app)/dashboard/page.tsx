@@ -76,7 +76,7 @@ const REASON_CONFIG: Record<
     Icon: CircleAlert,
   },
   inactive: {
-    label: "Inactive 3w",
+    label: "Inactive 4w",
     bg: "rgba(217,119,6,0.1)",
     text: "var(--band-c1)",
     Icon: Timer,
@@ -307,7 +307,7 @@ export default function DashboardPage() {
             ) : (
               <>
                 {data.attention.slice(0, 4).map((s) => {
-                  const config = REASON_CONFIG[s.reason]!;
+                  const config = REASON_CONFIG[s.reason] ?? REASON_CONFIG.incomplete!;
                   const ReasonIcon = config.Icon;
                   return (
                     <Link
@@ -355,12 +355,15 @@ export default function DashboardPage() {
                   );
                 })}
                 {data.attention.length > 4 && (
-                  <div className="flex items-center justify-center gap-1.5 border-t border-[var(--border)] px-6 py-3.5">
+                  <Link
+                    href="/students?filter=attention"
+                    className="flex items-center justify-center gap-1.5 border-t border-[var(--border)] px-6 py-3.5 transition-colors hover:bg-[var(--secondary)]/50"
+                  >
                     <span className="text-[13px] font-medium text-[var(--primary)]">
                       View all {data.attention.length} flagged students
                     </span>
                     <ArrowRight className="h-3.5 w-3.5 text-[var(--primary)]" />
-                  </div>
+                  </Link>
                 )}
               </>
             )}
