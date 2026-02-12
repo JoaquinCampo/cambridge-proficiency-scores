@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -81,9 +82,11 @@ export function AppNav() {
         {organization && (
           <div className="flex items-center gap-1.5 rounded-full bg-[var(--secondary)] px-3 py-1.5">
             {organization.imageUrl ? (
-              <img
+              <Image
                 src={organization.imageUrl}
                 alt={organization.name}
+                width={16}
+                height={16}
                 className="h-4 w-4 rounded-full object-cover"
               />
             ) : (

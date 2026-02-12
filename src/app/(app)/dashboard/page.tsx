@@ -190,9 +190,7 @@ export default function DashboardPage() {
               {/* Stacked bar */}
               {bandTotal > 0 && (
                 <div className="flex h-8 gap-1">
-                  {(
-                    Object.entries(data.bandDistribution) as [string, number][]
-                  ).map(([key, count]) => {
+                  {Object.entries(data.bandDistribution).map(([key, count]) => {
                     if (count === 0) return null;
                     const pct = (count / bandTotal) * 100;
                     const color = BAND_COLORS[key];

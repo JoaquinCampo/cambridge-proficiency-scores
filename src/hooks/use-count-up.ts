@@ -19,7 +19,7 @@ export function useCountUp(end: number, duration = 600): number {
     startRef.current = null;
 
     const step = (timestamp: number) => {
-      if (!startRef.current) startRef.current = timestamp;
+      startRef.current ??= timestamp;
       const elapsed = timestamp - startRef.current;
       const progress = Math.min(elapsed / duration, 1);
       // Ease-out cubic
