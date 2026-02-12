@@ -7,8 +7,11 @@ import {
   ChartLine,
   Users,
   Building2,
+  LayoutDashboard,
 } from "lucide-react";
+import { UserButton, useOrganization } from "@clerk/nextjs";
 import { cn } from "~/lib/utils";
+import { api } from "~/trpc/react";
 
 const studentLinks = [
   { href: "/", label: "Scores", icon: FileText },
@@ -16,15 +19,17 @@ const studentLinks = [
 ];
 
 const teacherLinks = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/students", label: "Students", icon: Users },
 ];
 
-// TODO: derive from Clerk session in production
-const DEV_ROLE = "teacher";
-
 export function AppNav() {
   const pathname = usePathname();
-  const links = DEV_ROLE === "teacher" ? [...studentLinks, ...teacherLinks] : studentLinks;
+  const { data: me } = api.user.me.useQuery();
+  const { organization } = useOrganization();
+
+  const isTeacher = me?.role === "teacher";
+  const links = isTeacher ? teacherLinks : studentLinks;
 
   return (
     <nav className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-6 py-3">
@@ -70,17 +75,17 @@ export function AppNav() {
       {/* Right side */}
       <div className="flex items-center gap-3">
         {/* Org badge */}
-        <div className="flex items-center gap-1.5 rounded-full bg-[var(--secondary)] px-3 py-1.5">
-          <Building2 className="h-3.5 w-3.5 text-[var(--muted-foreground)]" />
-          <span className="text-[13px] font-medium text-[var(--foreground)]">
-            B2 Monday
-          </span>
-        </div>
+        {organization && (
+          <div className="flex items-center gap-1.5 rounded-full bg-[var(--secondary)] px-3 py-1.5">
+            <Building2 className="h-3.5 w-3.5 text-[var(--muted-foreground)]" />
+            <span className="text-[13px] font-medium text-[var(--foreground)]">
+              {organization.name}
+            </span>
+          </div>
+        )}
 
-        {/* User avatar */}
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--primary)]">
-          <span className="text-xs font-semibold text-white">JC</span>
-        </div>
+        {/* User avatar from Clerk */}
+        <UserButton />
       </div>
     </nav>
   );

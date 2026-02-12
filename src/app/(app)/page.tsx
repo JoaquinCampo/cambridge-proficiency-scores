@@ -6,11 +6,29 @@ import { ScoreSnapshotCard } from "~/components/score-snapshot-card";
 import { ProgressDeltaCard } from "~/components/progress-delta-card";
 import { SkillSpotlightCard } from "~/components/skill-spotlight-card";
 import { OverallChart } from "~/components/overall-chart";
+import { redirect } from "next/navigation";
 
 export default function HomePage() {
-  const { data: scores, isLoading } = api.score.progress.useQuery();
+  const { data: me, isLoading: meLoading } = api.user.me.useQuery();
+  const { data: scores, isLoading: scoresLoading } =
+    api.score.progress.useQuery(undefined, {
+      enabled: me?.role === "student",
+    });
 
-  if (isLoading) {
+  if (meLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p className="text-sm text-[var(--muted-foreground)]">Loading...</p>
+      </div>
+    );
+  }
+
+  // Teachers land on the dashboard
+  if (me?.role === "teacher") {
+    redirect("/dashboard");
+  }
+
+  if (scoresLoading) {
     return (
       <>
         <PageHeader
