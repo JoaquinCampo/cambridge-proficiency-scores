@@ -14,20 +14,17 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary:
-    "bg-[var(--accent)] text-white shadow-[0_8px_18px_rgba(139,30,63,0.25)] hover:bg-[color-mix(in_oklab,var(--accent)_90%,black)]",
-  secondary:
-    "bg-[var(--accent-2)] text-white shadow-[0_8px_18px_rgba(15,76,92,0.25)] hover:bg-[color-mix(in_oklab,var(--accent-2)_90%,black)]",
-  ghost:
-    "bg-transparent text-[var(--ink)] hover:bg-[color-mix(in_oklab,var(--ink)_6%,transparent)]",
+  primary: "bg-[#0D0D0D] text-white hover:bg-black",
+  secondary: "bg-[var(--accent)] text-white hover:bg-[#c81f12]",
+  ghost: "bg-transparent text-[var(--ink)] hover:bg-[#f5f5f5]",
   outline:
-    "border border-[color-mix(in_oklab,var(--ink)_25%,transparent)] text-[var(--ink)] hover:bg-[color-mix(in_oklab,var(--ink)_6%,transparent)]",
+    "border border-[var(--border)] text-[var(--ink)] hover:bg-[#f7f7f7]",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: "h-9 px-3 text-sm",
-  md: "h-11 px-4 text-sm",
-  lg: "h-12 px-6 text-base",
+  sm: "h-9 px-4 text-xs",
+  md: "h-10 px-5 text-sm",
+  lg: "h-11 px-6 text-sm",
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -46,7 +43,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-full font-semibold tracking-[0.01em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] disabled:pointer-events-none disabled:opacity-60",
+          "inline-flex items-center justify-center gap-2 rounded-md font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:opacity-50",
           variantStyles[variant],
           sizeStyles[size],
           className,

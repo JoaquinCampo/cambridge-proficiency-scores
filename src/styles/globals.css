@@ -5,19 +5,289 @@
 }
 
 :root {
-  --bg: #f6efe3;
-  --ink: #1f1b16;
-  --accent: #8b1e3f;
-  --accent-2: #0f4c5c;
-  --gold: #b8894a;
+  /* ─── Warm neutral system ─── */
+  --background: #FAFAF9;
+  --foreground: #18181B;
+  --card: #FFFFFF;
+  --card-foreground: #18181B;
+  --primary: #4338CA;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F4F4F5;
+  --secondary-foreground: #18181B;
+  --muted: #F4F4F5;
+  --muted-foreground: #71717A;
+  --accent: #F4F4F5;
+  --accent-foreground: #18181B;
+  --destructive: #B91C1C;
+  --destructive-foreground: #FFFFFF;
+  --border: #E4E4E7;
+  --ring: #4338CA;
+
+  /* ─── Band colors — richer, deeper ─── */
+  --band-grade-a: #059669;
+  --band-grade-b: #4338CA;
+  --band-grade-c: #7C3AED;
+  --band-c1: #B45309;
+  --band-below-c1: #A1A1AA;
+
+  /* ─── Skill colors — muted, sophisticated ─── */
+  --skill-reading: #4F46E5;
+  --skill-uoe: #7C3AED;
+  --skill-writing: #059669;
+  --skill-listening: #D97706;
+  --skill-speaking: #E11D48;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-m: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+
+  /* Shadows — warm-tinted for cohesion */
+  --shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.04);
+  --shadow-card: 0 1px 3px rgba(24, 24, 27, 0.04), 0 4px 14px rgba(24, 24, 27, 0.03);
+  --shadow-card-hover: 0 2px 8px rgba(24, 24, 27, 0.06), 0 10px 28px rgba(24, 24, 27, 0.05);
+  --shadow-nav: 0 1px 3px rgba(24, 24, 27, 0.03), 0 1px 2px rgba(24, 24, 27, 0.02);
+
+  /* Transition */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body {
   font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--ink);
+  background: var(--background);
+  background-attachment: fixed;
+  color: var(--foreground);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative;
+}
+
+/* ─── Ambient gradient blobs ─── */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(80px);
+}
+
+body::before {
+  width: 600px;
+  height: 600px;
+  top: -200px;
+  right: -100px;
+  background: radial-gradient(circle, rgba(67, 56, 202, 0.05) 0%, transparent 70%);
+}
+
+body::after {
+  width: 500px;
+  height: 500px;
+  bottom: -100px;
+  left: -100px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.035) 0%, transparent 70%);
+}
+
+/* ─── Noise texture overlay ─── */
+body > *:first-child::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.3;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
 }
 
 .font-display {
   font-family: var(--font-display), "Times New Roman", serif;
+}
+
+/* ─── Card base ─── */
+.card-base {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transition:
+    box-shadow var(--transition-base),
+    transform var(--transition-base);
+}
+
+/* Inner glow — top-edge light reflection */
+.card-base::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, transparent 40%);
+  mask: linear-gradient(180deg, black 0%, transparent 30%);
+  -webkit-mask: linear-gradient(180deg, black 0%, transparent 30%);
+  opacity: 0.5;
+  z-index: 1;
+}
+
+.card-base:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+/* Cards that shouldn't lift (e.g. tables, inline elements) */
+.card-static {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+/* Inner glow for static cards too */
+.card-static::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, transparent 40%);
+  mask: linear-gradient(180deg, black 0%, transparent 30%);
+  -webkit-mask: linear-gradient(180deg, black 0%, transparent 30%);
+  opacity: 0.5;
+  z-index: 1;
+}
+
+/* ─── Page content fade-in ─── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation: fadeInUp var(--transition-slow) ease-out both;
+}
+
+.animate-in-delay-1 {
+  animation: fadeInUp var(--transition-slow) ease-out 50ms both;
+}
+
+.animate-in-delay-2 {
+  animation: fadeInUp var(--transition-slow) ease-out 100ms both;
+}
+
+.animate-in-delay-3 {
+  animation: fadeInUp var(--transition-slow) ease-out 150ms both;
+}
+
+/* ─── Skill bar fill animation ─── */
+@keyframes barFill {
+  from {
+    width: 0%;
+  }
+}
+
+.animate-bar {
+  animation: barFill 600ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* ─── Stagger children ─── */
+@keyframes staggerIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-children > * {
+  animation: staggerIn var(--transition-slow) ease-out both;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+
+/* ─── Score ring pulse ─── */
+@keyframes ringPulse {
+  0% { box-shadow: 0 0 0 0 rgba(67, 56, 202, 0.2); }
+  70% { box-shadow: 0 0 0 8px rgba(67, 56, 202, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(67, 56, 202, 0); }
+}
+
+.score-ring {
+  animation: ringPulse 2s ease-out;
+}
+
+/* ─── Nav glass ─── */
+.nav-glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ─── Shimmer skeleton loading ─── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--secondary) 25%,
+    rgba(244, 244, 245, 0.4) 50%,
+    var(--secondary) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-m);
+}
+
+.skeleton-text {
+  height: 14px;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-heading {
+  height: 24px;
+  width: 160px;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-card {
+  height: 200px;
+  border-radius: var(--radius-lg);
+}
+
+/* ─── Stat card icon well ─── */
+.icon-well {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  transition: transform var(--transition-fast);
+}
+
+.card-base:hover .icon-well {
+  transform: scale(1.05);
 }

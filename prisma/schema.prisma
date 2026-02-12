@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  clerkId          String        @id
+  email            String        @unique
+  name             String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  scores           ScoreLog[]
+  groupMemberships GroupMember[]
+}
+
+model Group {
+  id             String        @id @default(cuid())
+  name           String
+  organizationId String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  members        GroupMember[]
+  scores         ScoreLog[]
+
+  @@index([organizationId])
+}
+
+model GroupMember {
+  id       String    @id @default(cuid())
+  groupId  String
+  userId   String
+  active   Boolean   @default(true)
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId, active])
+  @@index([groupId])
+}
+
+model ScoreLog {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  groupId        String?
+  examDate       DateTime
+  reading        Int?
+  useOfEnglish   Int?
+  writing        Int?
+  listening      Int?
+  speaking       Float?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  group          Group?   @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([groupId])
+  @@index([userId, examDate])
+}
