@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -16,7 +16,7 @@ import { PageHeader } from "~/components/page-header";
 import { GroupSelector } from "~/components/group-selector";
 import { BandBadge } from "~/components/band-badge";
 import { StudentListSkeleton } from "~/components/skeleton";
-import { REASON_CONFIG, type AttentionReason } from "~/lib/attention";
+import { REASON_CONFIG } from "~/lib/attention";
 import type { ComponentKey } from "~/lib/scoring";
 
 function getInitials(name: string | null) {
@@ -80,6 +80,14 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export default function StudentsPage() {
+  return (
+    <Suspense>
+      <StudentsPageContent />
+    </Suspense>
+  );
+}
+
+function StudentsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -156,7 +164,7 @@ export default function StudentsPage() {
   const { data, isLoading } = api.score.studentList.useQuery({
     groupId: selectedGroupId ?? undefined,
     search: debouncedSearch || undefined,
-    band: band !== "all" ? (band as "Grade A" | "Grade B" | "Grade C" | "Level C1" | "No certificate") : undefined,
+    band: band !== "all" ? band : undefined,
     attention: attentionFilter || undefined,
     sort: sortKey,
     sortDir: sortAsc ? "asc" : "desc",
@@ -418,14 +426,14 @@ export default function StudentsPage() {
                         className="inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold"
                         style={{
                           backgroundColor:
-                            REASON_CONFIG[s.attention.reason as AttentionReason]
+                            REASON_CONFIG[s.attention.reason]
                               .bg,
                           color:
-                            REASON_CONFIG[s.attention.reason as AttentionReason]
+                            REASON_CONFIG[s.attention.reason]
                               .text,
                         }}
                       >
-                        {REASON_CONFIG[s.attention.reason as AttentionReason].label}
+                        {REASON_CONFIG[s.attention.reason].label}
                       </span>
                     ) : (
                       <span className="text-[10px] text-[var(--muted-foreground)]">
